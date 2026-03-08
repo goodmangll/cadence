@@ -19,6 +19,10 @@ export interface ExecutionConfig {
     command: string;
     args?: string[];
   }>;
+  outputFormat?: {
+    type: 'json_schema';
+    schema: Record<string, any>;
+  };
 }
 
 export interface Task {

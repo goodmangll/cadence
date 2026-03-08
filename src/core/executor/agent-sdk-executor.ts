@@ -43,7 +43,13 @@ export class AgentSDKExecutor {
       options.disallowedTools = task.execution.disallowedTools;
     }
 
+    // 如果有 outputFormat
+    if (task.execution.outputFormat) {
+      options.outputFormat = task.execution.outputFormat;
+    }
+
     let output = '';
+    let structuredOutput: any = undefined;
     let cost: number | undefined;
     let timedOut = false;
 
@@ -73,9 +79,14 @@ export class AgentSDKExecutor {
           output += `[${message.tool_name}] executing...\n`;
         } else if (message.type === 'result') {
           if (message.subtype === 'success') {
-            output += message.result;
+            output += message.result || '';
           } else {
             output += message.errors?.join('\n') || 'Execution error';
+          }
+          // 提取 structured_output
+          const resultMsg = message as any;
+          if (resultMsg.structured_output) {
+            structuredOutput = resultMsg.structured_output;
           }
           cost = message.total_cost_usd;
         }
@@ -89,6 +100,7 @@ export class AgentSDKExecutor {
         output: output.trim(),
         duration,
         cost,
+        structuredOutput,
       };
     } catch (error: any) {
       clearTimeout(timeoutId);
