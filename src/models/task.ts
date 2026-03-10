@@ -27,6 +27,7 @@ export interface ExecutionConfig {
     type: 'json_schema';
     schema: Record<string, any>;
   };
+  sessionGroup?: string;
 }
 
 export interface Task {
