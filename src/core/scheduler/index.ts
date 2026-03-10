@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { Mutex } from 'async-mutex';
 import { FileStore } from '../store/file-store';
 import { Task } from '../../models/task';
 import { parseCron, getNextRunTime, resolveAlias } from './cron-parser';
@@ -16,6 +17,7 @@ export class Scheduler {
   private running: boolean = false;
   private initialized: boolean = false;
   private onTaskTrigger?: (task: Task) => Promise<void>;
+  private sessionLocks: Map<string, Mutex> = new Map();
 
   constructor(baseDir?: string) {
     this.store = new FileStore(baseDir || process.cwd());
@@ -112,6 +114,19 @@ export class Scheduler {
       async () => {
         logger.info('Task triggered', { taskId: task.id, name: task.name });
 
+        const sessionGroup = task.execution.sessionGroup;
+        let release: (() => void) | undefined;
+
+        // 如果有 sessionGroup，获取锁
+        if (sessionGroup) {
+          let lock = this.sessionLocks.get(sessionGroup);
+          if (!lock) {
+            lock = new Mutex();
+            this.sessionLocks.set(sessionGroup, lock);
+          }
+          release = await lock.acquire();
+        }
+
         try {
           if (this.onTaskTrigger) {
             await this.onTaskTrigger(task);
@@ -127,6 +142,8 @@ export class Scheduler {
             taskId: task.id,
             error: error instanceof Error ? error.message : String(error),
           });
+        } finally {
+          release?.();
         }
       },
       {
