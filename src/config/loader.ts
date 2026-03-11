@@ -5,7 +5,6 @@ import os from 'os';
 export { Config, RawConfig } from './types';
 import { Config, RawConfig } from './types';
 import { logger } from '../utils/logger';
-import { loadFileConfig, CadenceConfig } from './file-config';
 
 // Convert snake_case keys to camelCase
 function camelCaseKeys(obj: any): any {
@@ -75,30 +74,6 @@ function mergeConfig(defaults: Config, raw?: RawConfig): Config {
 export async function loadConfig(configPath?: string): Promise<Config> {
   const defaults = getDefaultConfig();
 
-  // First, try to load from .cadence/config.yaml in current working directory
-  const cwd = process.cwd();
-  const fileConfig = await loadFileConfig(cwd);
-
-  // Convert file config to RawConfig format
-  const fileRaw: RawConfig = {
-    claude: fileConfig.claude ? {
-      cliPath: fileConfig.claude.cli_path || '',
-      apiKey: fileConfig.claude.api_key || '',
-      model: fileConfig.claude.model || '',
-    } : undefined,
-    scheduler: fileConfig.scheduler ? {
-      tickInterval: fileConfig.scheduler.tick_interval,
-      maxConcurrent: fileConfig.scheduler.max_concurrent,
-    } : undefined,
-    logging: fileConfig.logging ? {
-      level: fileConfig.logging.level,
-    } : undefined,
-  };
-
-  // Merge file config with defaults first
-  let config = mergeConfig(defaults, fileRaw);
-
-  // Then load global config if exists
   if (!configPath) {
     const configDir = path.join(os.homedir(), '.config', 'cadence');
     configPath = path.join(configDir, 'config.yaml');
@@ -106,15 +81,15 @@ export async function loadConfig(configPath?: string): Promise<Config> {
 
   try {
     const content = await fs.readFile(configPath, 'utf-8');
-    const globalRaw = camelCaseKeys(yaml.load(content)) as RawConfig;
-    config = mergeConfig(config, globalRaw);
+    const raw = camelCaseKeys(yaml.load(content)) as RawConfig;
+    const config = mergeConfig(defaults, raw);
     logger.info('Configuration loaded from file', { path: configPath });
+    return config;
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as any).code !== 'ENOENT') {
-      logger.warn('Failed to load global config file, using defaults', { error: (error as Error).message });
+      logger.warn('Failed to load config file, using defaults', { error: (error as Error).message });
     }
     logger.info('Using default configuration');
+    return defaults;
   }
-
-  return config;
 }

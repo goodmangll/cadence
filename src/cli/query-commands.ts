@@ -1,30 +1,23 @@
-import { FileStore } from '../core/store/file-store';
+import { TaskStore, ExecutionFilter } from '../core/store/database';
+import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { Task } from '../models/task';
-import { Execution } from '../models/execution';
 
 export async function handleLogs(options: any): Promise<void> {
-  const store = new FileStore(process.cwd());
+  const config = await loadConfig();
+  const store = new TaskStore(config.storage.dbPath);
 
   try {
-    const limit = parseInt(options.limit, 10) || 10;
-    let executions: Execution[];
+    await store.init();
+
+    const filter: ExecutionFilter = {
+      limit: parseInt(options.limit, 10) || 10,
+    };
 
     if (options.taskId) {
-      executions = await store.getExecutions(options.taskId, limit);
-    } else {
-      // Get all tasks and their executions
-      const tasks = await store.listTasks();
-      executions = [];
-      for (const task of tasks) {
-        const taskExecs = await store.getExecutions(task.id, limit);
-        executions.push(...taskExecs);
-      }
-      // Sort by startedAt and limit
-      executions = executions
-        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-        .slice(0, limit);
+      filter.taskId = options.taskId;
     }
+
+    const executions = await store.loadExecutions(filter);
 
     if (executions.length === 0) {
       console.log('No execution logs found.');
@@ -33,7 +26,7 @@ export async function handleLogs(options: any): Promise<void> {
       for (const exec of executions) {
         console.log(`  Task ID: ${exec.taskId}`);
         console.log(`  Status: ${exec.status}`);
-        console.log(`  Started: ${new Date(exec.startedAt).toISOString()}`);
+        console.log(`  Started: ${exec.startedAt.toISOString()}`);
         if (exec.durationMs) {
           console.log(`  Duration: ${exec.durationMs}ms`);
         }
@@ -46,6 +39,8 @@ export async function handleLogs(options: any): Promise<void> {
         console.log();
       }
     }
+
+    await store.close();
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error('Failed to load logs', { error: errorMsg });
@@ -55,23 +50,20 @@ export async function handleLogs(options: any): Promise<void> {
 }
 
 export async function handleStats(): Promise<void> {
-  const store = new FileStore(process.cwd());
+  const config = await loadConfig();
+  const store = new TaskStore(config.storage.dbPath);
 
   try {
-    const tasks = await store.listTasks();
-    const enabledTasks = tasks.filter((t: Task) => t.enabled).length;
+    await store.init();
+
+    const tasks = await store.loadTasks();
+    const enabledTasks = tasks.filter(t => t.enabled).length;
     const disabledTasks = tasks.length - enabledTasks;
 
-    // Get executions for all tasks
-    const executions: Execution[] = [];
-    for (const task of tasks) {
-      const taskExecs = await store.getExecutions(task.id, 1000);
-      executions.push(...taskExecs);
-    }
-
-    const successExecutions = executions.filter((e: Execution) => e.status === 'success').length;
-    const failedExecutions = executions.filter((e: Execution) => e.status === 'failed').length;
-    const timeoutExecutions = executions.filter((e: Execution) => e.status === 'timeout').length;
+    const executions = await store.loadExecutions({ limit: 1000 });
+    const successExecutions = executions.filter(e => e.status === 'success').length;
+    const failedExecutions = executions.filter(e => e.status === 'failed').length;
+    const timeoutExecutions = executions.filter(e => e.status === 'timeout').length;
 
     console.log('Cadence Statistics');
     console.log('==================');
@@ -86,6 +78,8 @@ export async function handleStats(): Promise<void> {
     console.log(`  Success: ${successExecutions}`);
     console.log(`  Failed: ${failedExecutions}`);
     console.log(`  Timeout: ${timeoutExecutions}`);
+
+    await store.close();
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error('Failed to load stats', { error: errorMsg });

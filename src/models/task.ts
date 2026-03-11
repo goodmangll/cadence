@@ -2,10 +2,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type SettingSource = 'user' | 'project' | 'local';
 
-export interface TaskFilter {
-  enabled?: boolean;
-}
-
 export interface Trigger {
   type: 'cron' | 'interval';
   expression?: string;

@@ -5,6 +5,7 @@ dist/
 coverage/
 .env
 .env.local
+local/
 *.sqlite
 *.db
-.worktrees/
+./docs/plans/

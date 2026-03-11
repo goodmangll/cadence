@@ -1,14 +1,14 @@
-import { FileStore } from '../store/file-store';
-import { Task, createTask, validateTask, TaskFilter } from '../../models/task';
+import { TaskStore, TaskFilter } from '../store/database';
+import { Task, createTask, validateTask } from '../../models/task';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
 
 export class TaskManager {
-  private store: FileStore;
+  private store: TaskStore;
   private initialized: boolean = false;
 
-  constructor(baseDir?: string) {
-    this.store = new FileStore(baseDir || process.cwd());
+  constructor(dbPath?: string) {
+    this.store = new TaskStore(dbPath);
   }
 
   async init(): Promise<void> {
@@ -16,11 +16,13 @@ export class TaskManager {
       return;
     }
 
+    await this.store.init();
     this.initialized = true;
     logger.info('Task manager initialized');
   }
 
   async close(): Promise<void> {
+    await this.store.close();
     this.initialized = false;
   }
 
@@ -48,12 +50,12 @@ export class TaskManager {
 
   async getTask(id: string): Promise<Task | null> {
     this.ensureInitialized();
-    return this.store.getTask(id) as Promise<Task | null>;
+    return this.store.getTask(id);
   }
 
   async listTasks(filter?: TaskFilter): Promise<Task[]> {
     this.ensureInitialized();
-    return this.store.listTasks(filter);
+    return this.store.loadTasks(filter);
   }
 
   async updateTask(id: string, updates: Partial<Task>): Promise<Task> {

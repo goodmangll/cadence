@@ -3,7 +3,7 @@ import * as path from 'path';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
-import { FileStore } from '../core/store/file-store';
+import { TaskStore } from '../core/store/database';
 import { Task } from '../models/task';
 import { createExecution, finishExecution } from '../models/execution';
 import { loadConfig } from '../config/loader';
@@ -14,19 +14,20 @@ export async function handleRun(): Promise<void> {
   const config = await loadConfig();
 
   // Initialize components
-  const baseDir = process.cwd();
-  const taskManager = new TaskManager(baseDir);
-  const scheduler = new Scheduler(baseDir);
+  const taskManager = new TaskManager(config.storage.dbPath);
+  const scheduler = new Scheduler(config.storage.dbPath);
   const executor = new Executor({ defaultTimeout: config.scheduler.maxConcurrent });
-  const fileStore = new FileStore(baseDir);
+  const taskStore = new TaskStore(config.storage.dbPath);
 
   // Initialize all components
   await taskManager.init();
   await scheduler.init();
+  await taskStore.init();
 
   logger.info('Cadence scheduler starting...');
 
   // Load tasks from .cadence/tasks/ directory
+  const baseDir = process.cwd();
   const tasksDir = path.join(baseDir, '.cadence', 'tasks');
 
   try {
@@ -54,12 +55,12 @@ export async function handleRun(): Promise<void> {
     logger.info('Executing task', { taskId: task.id, name: task.name });
 
     const execution = createExecution(task.id);
-    await fileStore.saveExecution(execution);
+    await taskStore.saveExecution(execution);
 
     try {
       const result = await executor.execute(task);
       const finished = finishExecution(execution, result);
-      await fileStore.saveExecution(finished);
+      await taskStore.saveExecution(finished);
     } catch (error: unknown) {
       logger.error('Task execution failed', {
         taskId: task.id,
@@ -73,6 +74,7 @@ export async function handleRun(): Promise<void> {
     logger.info('Received SIGINT, shutting down...');
     await scheduler.stop();
     await taskManager.close();
+    await taskStore.close();
     executor.close();
     process.exit(0);
   });
@@ -81,6 +83,7 @@ export async function handleRun(): Promise<void> {
     logger.info('Received SIGTERM, shutting down...');
     await scheduler.stop();
     await taskManager.close();
+    await taskStore.close();
     executor.close();
     process.exit(0);
   });

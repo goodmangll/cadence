@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { Mutex } from 'async-mutex';
 import { FileStore } from '../store/file-store';
+import { TaskStore } from '../store/database';
 import { Task } from '../../models/task';
 import { parseCron, getNextRunTime, resolveAlias } from './cron-parser';
 import { logger } from '../../utils/logger';
@@ -12,15 +13,15 @@ interface ScheduledTask {
 }
 
 export class Scheduler {
-  private store: FileStore;
+  private store: TaskStore;
   private scheduledTasks: Map<string, ScheduledTask>;
   private running: boolean = false;
   private initialized: boolean = false;
   private onTaskTrigger?: (task: Task) => Promise<void>;
   private sessionLocks: Map<string, Mutex> = new Map();
 
-  constructor(baseDir?: string) {
-    this.store = new FileStore(baseDir || process.cwd());
+  constructor(dbPath?: string) {
+    this.store = new TaskStore(dbPath);
     this.scheduledTasks = new Map();
   }
 
@@ -29,12 +30,14 @@ export class Scheduler {
       return;
     }
 
+    await this.store.init();
     this.initialized = true;
     logger.info('Scheduler initialized');
   }
 
   async close(): Promise<void> {
     await this.stop();
+    await this.store.close();
     this.initialized = false;
   }
 
@@ -48,7 +51,7 @@ export class Scheduler {
     this.running = true;
 
     // Load and schedule all enabled tasks
-    const tasks = await this.store.listTasks({ enabled: true });
+    const tasks = await this.store.loadTasks({ enabled: true });
     for (const task of tasks) {
       await this.scheduleTask(task);
     }
@@ -172,8 +175,8 @@ export class Scheduler {
 
   private async updateTaskNextRun(taskId: string, nextRun: Date): Promise<void> {
     // Update task in store
-    const tasks = await this.store.listTasks();
-    const task = tasks.find((t: Task) => t.id === taskId);
+    const tasks = await this.store.loadTasks();
+    const task = tasks.find((t) => t.id === taskId);
     if (task) {
       task.nextRunAt = nextRun;
       await this.store.saveTask(task);
