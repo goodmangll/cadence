@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目概述
 
@@ -155,16 +155,7 @@ cadence/
 使用 node-cron 实现内置调度器，解析 Cron 表达式、计算下次执行时间、管理任务队列。位于 `src/core/scheduler/`。
 
 ### M3: Executor（执行器）
-使用 @anthropic-ai/claude-agent-sdk 执行 Claude Code 命令，捕获输出、管理超时。位于 `src/core/executor/`。
-
-**关键设计**：通过 `settingSources` 配置加载项目的 Claude Code 配置：
-```typescript
-settingSources: ['user', 'project', 'local']
-```
-这会自动加载：
-- `~/.claude/settings.json`（全局配置）
-- `.claude/settings.json`（项目配置，自动加载 Skills 和 MCP）
-- `.claude/settings.local.json`（本地配置）
+使用 @anthropic-ai/claude-agent-sdk 执行 Claude Code 命令，捕获输出、管理（超时。位于 `src/core/executor/`。
 
 ### M4: Task Store（任务存储）
 使用 SQLite + better-sqlite3 存储任务配置和执行历史。位于 `src/core/store/`。
@@ -183,10 +174,10 @@ CREATE TABLE tasks (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    trigger TEXT NOT NULL,          -- JSON: { type, expression, timezone }
+    trigger TEXT NOT NULL,                   -- JSON: { type, expression, timezone }
     execution TEXT NOT NULL,        -- JSON: { command, workingDir, timeout, settingSources }
     post_actions TEXT,             -- JSON: PostAction[]
-    enabled BOOLEAN DEFAULT TRUE,
+    enabled INTEGER DEFAULT TRUE,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     next_run_at INTEGER,
@@ -237,7 +228,7 @@ CREATE TABLE config (
 claude:
   cli_path: ""
   api_key: ""
-  model: "claude-sonnet-4-5-20250929-v1:0"
+  model: "claude-sonnet-4-5-20250929-v1:0:0"
 
 scheduler:
   tick_interval: 1
@@ -255,6 +246,7 @@ logging:
 api:
   enabled: false
   addr: "127.0.0.1:8080"
+"
   auth_token: ""
 ```
 
@@ -276,9 +268,6 @@ tasks:
         - "user"
         - "project"
         - "local"
-    post_actions:
-      - type: "notification"
-        channels: ["slack"]
 ```
 
 ---
@@ -316,7 +305,6 @@ LaunchAgent 配置文件位置：`~/Library/LaunchAgents/cadence-gateway.plist`
 | DELETE | `/tasks/:id` | 删除任务 |
 | POST | `/tasks/:id/run` | 立即执行任务 |
 | GET | `/tasks/:id/logs` | 获取任务日志 |
-| GET | `/executions` | 查询执行历史 |
 | GET | `/stats` | 获取统计信息 |
 
 ### WebSocket 事件
@@ -338,17 +326,7 @@ LaunchAgent 配置文件位置：`~/Library/LaunchAgents/cadence-gateway.plist`
 - better-sqlite3: 9.x
 - node-cron: 3.x
 - pino: 9.x
-
-### 设置源（settingSources）设计
-这是 Cadence 的关键设计点，确保任务执行时能够正确加载项目的 Claude Code 配置：
-
-1. **必须显式设置** `settingSources`，否则不会加载任何文件系统配置
-2. **配置优先级**：local > project > user
-3. **自动加载内容**：
-   - `.claude/settings.json`（项目配置）
-   - `.claude/skills/`（Skills）
-   - `.claude/mcp.json`（MCP 配置）
-   - `CLAUDE.md`（项目指南）
+- @anthropic-ai/claude-agent-sdk: 最新版
 
 ### 数据库操作
 - 使用 better-sqlite3 的同步 API
@@ -376,3 +354,193 @@ LaunchAgent 配置文件位置：`~/Library/LaunchAgents/cadence-gateway.plist`
 ### E2E 测试
 - 测试守护进程安装和卸载
 - 测试 API 端点（可选）
+
+---
+
+## Session 上下文管理（新功能）
+
+### 功能概述
+
+解决 Cadence 使用 Agent SDK 长期运行时的上下文膨胀问题：
+
+1. **死锁预防** - 当 session 上下文过大无法恢复时，自动创建新 session
+2. **信息保护** - 通过 PreCompact Hook 备份完整对话记录
+3. **上下文传递** - 通过进度摘要文件在新 session 中恢复工作上下文
+
+### 配置说明
+
+#### 启用 Session 共享
+
+在任务配置中添加 `sessionGroup` 字段即可启用 session 共享：
+
+```yaml
+tasks:
+  - id: "my-task"
+    sessionGroup: "my-group"  # 启用共享
+    # ...
+```
+
+#### Rollover 策略
+
+控制何时创建新 session 的策略：
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `maxExecutions` | number | 10 | 每执行多少次后 rollover |
+| `maxHours` | number | 168 (7天) | 每多少小时后 rollover |
+
+```yaml
+tasks:
+  - sessionGroup: "my-group"
+    rolloverStrategy:
+      maxExecutions: 10  # 每 10 次执行后
+      maxHours: 168     # 或每 7 天后
+```
+
+#### 进度摘要配置
+
+控制是否生成进度摘要及其格式：
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | boolean | true | 是否启用进度摘要 |
+| `maxLength` | number | 2000 | 摘要最大字符数 |
+| `outputPath` | string | .claude/progress-{group}.md | 自定义输出路径 |
+
+```yaml
+tasks:
+  - sessionGroup: "my-group"
+    progressConfig:
+      enabled: true
+      maxLength: 2000
+```
+
+### Hook 脚本
+
+#### PreCompact Hook
+
+在每次 compaction 发生前备份完整的对话记录：
+
+```bash
+# ~/.claude/hooks/pre-compact-backup.sh
+BACKUP_DIR="$HOME/.cadence/sessions/backups"
+SESSION_GROUP="${CLAUDE_SESSION_GROUP:-default}"
+
+mkdir -p "$BACKUP_DIR"
+if [ -n "$CLAUDE_TRANSCRIPT_PATH" ]; then
+    cp "$CLAUDE_TRANSCRIPT_PATH" "$BACKUP_DIR/${SESSION_GROUP}-pre-compact.jsonl"
+fi
+```
+
+#### SessionStart Hook
+
+当从 compact 恢复 session 时注入之前的对话上下文：
+
+```bash
+# ~/.claude/hooks/session-start-recover.sh
+BACKUP_DIR="$HOME/.cadence/sessions/backups"
+SESSION_GROUP="${CLAUDE_SESSION_GROUP:-default}"
+
+if [ "$CLAUDE_SESSION_SOURCE" = "compact" ]; then
+    BACKUP_FILE="$BACKUP_DIR/${SESSION_GROUP}-pre-compact.jsonl"
+    if [ -f "$BACKUP_FILE" ]; then
+        tail -50 "$BACKUP_FILE"
+    fi
+fi
+```
+
+### 进度摘要文件
+
+每次任务执行完成后，会生成 `progress-{group}.md` 文件：
+
+```markdown
+## Session Progress Summary
+
+**Task**: <任务名称>
+**Group**: <session group>
+**Status**: <success/failed/timeout>
+**Executed at**: <ISO timestamp>
+**Duration**: <duration>ms
+
+### Output
+```
+<输出内容>
+```
+
+### Git Status
+```
+<git status 输出>
+```
+
+### Next Steps
+<!-- 由后续 Claude Code session 自动填写下一步 -->
+
+---
+*Generated by Cadence at <timestamp>*
+```
+
+这个文件会被自动加载到下一个 session 的上下文中。
+
+### 文件结构
+
+```
+~/.cadence/sessions/
+├── groups/              # Session ID 持久化
+│   ├── my-group.json
+│   └── ...
+├── states/              # Session 状态（执行次数等）
+│   ├── my-group.json
+│   └── ...
+└── backups/              # PreCompact 备份
+    ├── my-group-pre-compact.jsonl
+    └── ...
+
+{project_dir}/.claude/
+├── hooks/
+│   ├── pre-compact-backup.sh
+│   └── session-start-recover.sh
+└── progress-{group}.md  # 进度摘要
+```
+
+### CLI 命令
+
+```bash
+# 触发 rollover
+cadence session rollover <group>
+
+# 查看 session 状态
+cadence session status <group>
+```
+
+### 使用示例
+
+```bash
+# 创建或更新任务配置
+cadence task create \
+  --name "Daily Code Review" \
+  --session-group "code-review" \
+  --rollover-max-executions 10 \
+  --rollover-max-hours 168
+
+# 手动触发 rollover
+cadence session rollover code-review
+```
+
+### 故障排查
+
+### Session 无法恢复
+
+**症状**: 任务执行失败，日志显示 "Session too large" 或 "Prompt is too long"
+
+**解决方法**:
+1. 检查 rollover 策略配置，降低触发阈值
+2. 手动执行 rollover：`cadence session rollover <group>`
+
+### Hook 脚本不执行
+
+**症状**: 备份文件未生成
+
+**解决方法**:
+1. 确保 Hook 脚本有执行权限：`chmod +x ~/.claude/hooks/*.sh`
+2. 检查 `.claude/hooks/` 目录是否存在
+3. 查看 Cadence 日志验证 Hook 加载
