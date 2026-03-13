@@ -198,9 +198,18 @@ export class TaskStore {
       throw new Error('Database not initialized');
     }
 
-    let sql = 'SELECT * FROM executions';
+    let sql: string;
     const params: any[] = [];
     const conditions: string[] = [];
+
+    // If sessionGroup is specified, we need to JOIN with tasks table
+    if (filter?.sessionGroup) {
+      sql = 'SELECT executions.* FROM executions INNER JOIN tasks ON executions.task_id = tasks.id';
+      conditions.push("json_extract(tasks.execution, '$.sessionGroup') = ?");
+      params.push(filter.sessionGroup);
+    } else {
+      sql = 'SELECT * FROM executions';
+    }
 
     if (filter?.taskId) {
       conditions.push('task_id = ?');

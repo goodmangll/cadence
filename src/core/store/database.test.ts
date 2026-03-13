@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskStore } from './database';
 import { Task, createTask } from '../../models/task';
+import { Execution, createExecution } from '../../models/execution';
 import { v4 as uuidv4 } from 'uuid';
 import os from 'os';
 import path from 'path';
@@ -108,5 +109,151 @@ describe('Task Store', () => {
     const disabledTasks = await store.loadTasks({ enabled: false });
     expect(disabledTasks).toHaveLength(1);
     expect(disabledTasks[0].name).toBe('Disabled Task');
+  });
+
+  it('should save and retrieve executions', async () => {
+    const task = createTask({
+      id: uuidv4(),
+      name: 'Test Task',
+      execution: { command: 'test' },
+    });
+
+    await store.saveTask(task);
+
+    const exec = createExecution(task.id);
+    exec.status = 'success';
+
+    await store.saveExecution(exec);
+
+    const executions = await store.loadExecutions();
+    expect(executions).toHaveLength(1);
+    expect(executions[0].id).toBe(exec.id);
+    expect(executions[0].taskId).toBe(task.id);
+  });
+
+  it('should filter executions by sessionGroup', async () => {
+    // Create tasks with different session groups
+    const task1 = createTask({
+      id: 'task-1',
+      name: 'Task 1',
+      execution: {
+        command: 'test',
+        sessionGroup: 'group-a',
+      },
+    });
+
+    const task2 = createTask({
+      id: 'task-2',
+      name: 'Task 2',
+      execution: {
+        command: 'test',
+        sessionGroup: 'group-b',
+      },
+    });
+
+    const task3 = createTask({
+      id: 'task-3',
+      name: 'Task 3',
+      execution: {
+        command: 'test',
+        // No session group
+      },
+    });
+
+    await store.saveTask(task1);
+    await store.saveTask(task2);
+    await store.saveTask(task3);
+
+    // Create executions
+    const exec1: Execution = {
+      id: 'exec-1',
+      taskId: 'task-1',
+      status: 'success',
+      startedAt: new Date('2026-03-14T10:00:00Z'),
+    };
+
+    const exec2: Execution = {
+      id: 'exec-2',
+      taskId: 'task-2',
+      status: 'success',
+      startedAt: new Date('2026-03-14T11:00:00Z'),
+    };
+
+    const exec3: Execution = {
+      id: 'exec-3',
+      taskId: 'task-3',
+      status: 'success',
+      startedAt: new Date('2026-03-14T12:00:00Z'),
+    };
+
+    await store.saveExecution(exec1);
+    await store.saveExecution(exec2);
+    await store.saveExecution(exec3);
+
+    // Test filter by group-a
+    const groupAExecs = await store.loadExecutions({ sessionGroup: 'group-a' });
+    expect(groupAExecs).toHaveLength(1);
+    expect(groupAExecs[0].id).toBe('exec-1');
+
+    // Test filter by group-b
+    const groupBExecs = await store.loadExecutions({ sessionGroup: 'group-b' });
+    expect(groupBExecs).toHaveLength(1);
+    expect(groupBExecs[0].id).toBe('exec-2');
+
+    // Test filter by non-existent group
+    const noGroupExecs = await store.loadExecutions({ sessionGroup: 'non-existent' });
+    expect(noGroupExecs).toHaveLength(0);
+
+    // Test without filter returns all
+    const allExecs = await store.loadExecutions();
+    expect(allExecs).toHaveLength(3);
+  });
+
+  it('should filter executions by both taskId and sessionGroup', async () => {
+    const task1 = createTask({
+      id: 'task-1',
+      name: 'Task 1',
+      execution: {
+        command: 'test',
+        sessionGroup: 'group-a',
+      },
+    });
+
+    const task2 = createTask({
+      id: 'task-2',
+      name: 'Task 2',
+      execution: {
+        command: 'test',
+        sessionGroup: 'group-a',
+      },
+    });
+
+    await store.saveTask(task1);
+    await store.saveTask(task2);
+
+    const exec1: Execution = {
+      id: 'exec-1',
+      taskId: 'task-1',
+      status: 'success',
+      startedAt: new Date('2026-03-14T10:00:00Z'),
+    };
+
+    const exec2: Execution = {
+      id: 'exec-2',
+      taskId: 'task-2',
+      status: 'success',
+      startedAt: new Date('2026-03-14T11:00:00Z'),
+    };
+
+    await store.saveExecution(exec1);
+    await store.saveExecution(exec2);
+
+    // Test with both filters
+    const filtered = await store.loadExecutions({
+      sessionGroup: 'group-a',
+      taskId: 'task-1',
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].id).toBe('exec-1');
   });
 });
