@@ -64,7 +64,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
         });
       }
     } catch (error: any) {
-      if (ctx.isAborted()) {
+      if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
         executionError = error;
@@ -113,8 +113,8 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
     ctx: ReturnType<typeof TimeoutHelper.createExecutionContext>
   ): Promise<void> {
     for await (const msg of session.stream()) {
-      if (ctx.isAborted()) {
-        break;
+      if (ctx.isTimedOut()) {
+        throw new Error('Command timed out');
       }
       collector.collect(msg);
     }

@@ -6,18 +6,15 @@ export class TimeoutHelper {
    * 创建一个可取消的执行上下文
    */
   static createExecutionContext(timeoutMs: number) {
-    const controller = new AbortController();
-    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
-      controller.abort();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
     }, timeoutMs);
 
     return {
-      isAborted: () => controller.signal.aborted,
+      isTimedOut: () => timedOut,
       cleanup: () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
+        clearTimeout(timeoutId);
       },
     };
   }

@@ -31,7 +31,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
     try {
       await this.executeStream(task, options, collector, ctx);
     } catch (error: any) {
-      if (ctx.isAborted()) {
+      if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
         executionError = error;
@@ -77,8 +77,8 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
       prompt: task.execution.command,
       options,
     })) {
-      if (ctx.isAborted()) {
-        break;
+      if (ctx.isTimedOut()) {
+        throw new Error('Command timed out');
       }
       collector.collect(message);
     }
