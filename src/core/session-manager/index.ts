@@ -2,16 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import os from 'os';
 import { SessionState, RolloverStrategy } from './SessionState';
+export { SessionState, RolloverStrategy } from './SessionState';
 import { logger } from '../../utils/logger';
 
 /**
  * Session 状态接口（与原有 SessionData 兼容）
  */
-interface SessionData {
+export interface SessionData {
   sessionId: string;
   mode: 'v1' | 'v2';
   createdAt: string;
   updatedAt: string;
+  executions?: number;
+  lastRolloverAt?: string;
 }
 
 /**
@@ -71,7 +74,9 @@ export class SessionManager {
     const sessionPath = this.getSessionPath(group);
     try {
       fs.unlinkSync(sessionPath);
-    } // ignore ignore
+    } catch {
+      // ignore
+    }
   }
 
   /**
@@ -83,7 +88,9 @@ export class SessionManager {
       return files
         .filter(f => f.endsWith('.json'))
         .map(f => f.replace('.json', ''));
-    } // ignore ignore
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -98,7 +105,6 @@ export class SessionManager {
           this.sessionStates.set(group, state);
         }
       }
-    }
     } catch (error) {
       logger.warn('Failed to load session states', { error });
     }

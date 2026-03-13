@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { SessionManager } from '../../src/core/session-manager';
 import { ProgressSummaryGenerator } from '../../src/utils/progress-summary-generator';
-import { AgentSDKSDKExecutor } from '../../src/core/executor/agent-sdk-executor';
+import { AgentSDKExecutor } from '../../src/core/executor/agent-sdk-executor';
 import { Task } from '../../src/models/task';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -147,7 +147,7 @@ describe('Session Context Management Integration', () => {
         },
       });
 
-      const executor = new AgentSDKSDKExecutor();
+      const executor = new AgentSDKExecutor();
       const result = await executor.execute(task);
 
       expect(result.status).toBe('success');
@@ -155,7 +155,7 @@ describe('Session Context Management Integration', () => {
 
     it('should trigger rollover after threshold executions', async () => {
       const manager = new SessionManager(TEST_DIR);
-      const executor = new AgentSDKSDKExecutor();
+      const executor = new AgentSDKExecutor();
 
       // 第一次执行（2 次）
       let task = createMockTask({
@@ -198,7 +198,7 @@ describe('Session Context Management Integration', () => {
         },
       });
 
-      const executor = new AgentSDKSDKExecutor();
+      const executor = new AgentSDKExecutor();
 
       // 执行多次，触发 rollover
       for (let i = 0; i < 4; i++) {

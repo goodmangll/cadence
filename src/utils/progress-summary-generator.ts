@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Task } from '../../models/task';
-import { ExecutionResult } from '../../models/execution';
-import { logger } from '../utils/logger';
+import { Task } from '../models/task';
+import { ExecutionResult } from '../models/execution';
+import { logger } from './logger';
 
 /**
  * 进度摘要生成器
@@ -34,17 +34,14 @@ export class ProgressSummaryGenerator {
     // 获取 git 当前状态（如果可用）
     let gitState = '';
     try {
-      const { stdout } = await import('child_process').then(
-        ({ execSync }) => {
-          return execSync('git status --short', {
-            cwd: task.execution.workingDir,
-            encoding: 'utf-8',
-          });
-        }
-      );
+      const { execSync } = await import('child_process');
+      const stdout = execSync('git status --short', {
+        cwd: task.execution.workingDir || '.',
+        encoding: 'utf-8',
+      });
 
       if (stdout && stdout.trim()) {
-        gitState = `\n\n### Git Status\n\`\`\`\`\n${stdout.trim()}\n\`\`\`\``;
+        gitState = `\n\n### Git Status\n\`\`\`\n${stdout.trim()}\n\`\`\``;
       }
     } catch {
       // git 不可用，忽略

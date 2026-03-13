@@ -79,10 +79,10 @@ export class FileTaskConfigLoader {
       }
 
       const tasks = data.tasks as any[];
-      return tasks.map(this.convertToTaskConfig);
-    } catch {
-      // YAML 解析失败，抛出更明确的错误
-      throw new Error('Failed to parse task config as YAML. Please ensure the file is valid YAML format.');
+      return tasks.map((t) => this.convertToTaskConfig(t));
+    } catch (error) {
+      // 抛出真实错误
+      throw new Error(`Failed to parse task config: ${error}`);
     }
   }
 
