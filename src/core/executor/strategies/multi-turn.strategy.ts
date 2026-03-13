@@ -59,8 +59,6 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
           mode: 'v2',
           createdAt: sessionData?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          executions: sessionData?.executions || 0,
-          lastRolloverAt: sessionData?.lastRolloverAt,
         });
       }
     } catch (error: any) {

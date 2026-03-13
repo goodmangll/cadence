@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { SessionManager } from '../../src/core/session-manager';
-import { ProgressSummaryGenerator } from '../../src/utils/progress-summary-generator';
-import { AgentSDKExecutor } from '../../src/core/executor/agent-sdk-executor';
 import { Task } from '../../src/models/task';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as yaml from 'js-yaml';
 
 const TEST_DIR = path.join(os.tmpdir(), 'cadence-integration-test');
 
@@ -21,33 +18,23 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
       workingDir: TEST_DIR,
       settingSources: ['user', 'project'],
       sessionGroup: 'test-group',
-      rolloverStrategy: { maxExecutions: 3, maxHours: 1 },
-      progressConfig: { enabled: true, maxLength: 500 },
     },
     trigger: { type: 'cron', expression: '* * * *' },
     ...overrides,
   };
 }
 
-function createTaskConfig(content: string): any {
-  return yaml.load(content) as any;
-}
-
-describe('Session Context Management Integration', () => {
+describe('Session Management Integration', () => {
   beforeAll(() => {
-    // 清理测试目录
     try {
       fs.rmSync(TEST_DIR, { recursive: true, force: true });
     } catch {
       // ignore
     }
-
-    // 创建测试目录
     fs.mkdirSync(TEST_DIR, { recursive: true });
   });
 
   afterAll(() => {
-    // 清理测试目录
     try {
       fs.rmSync(TEST_DIR, { recursive: true, force: true });
     } catch {
@@ -55,159 +42,59 @@ describe('Session Context Management Integration', () => {
     }
   });
 
-  describe('SessionManager Rollover Logic', () => {
-    it('should trigger rollover by execution count', async () => {
+  describe('SessionManager', () => {
+    it('should save and load session', () => {
       const manager = new SessionManager(TEST_DIR);
-      const strategy = { maxExecutions: 3 };
 
-      // 设置初始状态
-      const initialState = {
-        sessionId: 'initial-session',
+      const sessionData = {
+        sessionId: 'test-session-123',
+        mode: 'v2' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      manager.saveSession('test-group', sessionData);
+
+      const loaded = manager.getSession('test-group');
+      expect(loaded).not.toBeNull();
+      expect(loaded?.sessionId).toBe('test-session-123');
+    });
+
+    it('should delete session', () => {
+      const manager = new SessionManager(TEST_DIR);
+
+      manager.saveSession('to-delete', {
+        sessionId: 'test',
         mode: 'v2',
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        executions: 2,
-        lastRolloverAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-      };
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
 
-      const statePath = path.join(TEST_DIR, 'states', 'test-group.json');
-      fs.mkdirSync(path.dirname(statePath), { recursive: true });
-      fs.writeFileSync(statePath, JSON.stringify(initialState, null, 2));
+      expect(manager.getSession('to-delete')).not.toBeNull();
 
-      // 检查应该触发
-      const shouldTrigger = await manager.shouldRollover('test-group', strategy);
-      expect(shouldTrigger).toBe(true);
+      manager.deleteSession('to-delete');
+      expect(manager.getSession('to-delete')).toBeNull();
     });
 
-    it('should not trigger when execution count is below threshold', async () => {
+    it('should list groups', () => {
       const manager = new SessionManager(TEST_DIR);
-      const strategy = { maxExecutions: 10 };
 
-      const initialState = {
-        sessionId: 'initial-session',
+      manager.saveSession('group-1', {
+        sessionId: 's1',
         mode: 'v2',
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        executions: 5,
-      };
-
-      const statePath = path.join(TEST_DIR, 'states', 'test-group.json');
-      fs.mkdirSync(path.dirname(statePath), { recursive: true });
-      fs.writeFileSync(statePath, JSON.stringify(initialState, null, 2));
-
-      const shouldTrigger = await manager.shouldRollover('test-group', strategy);
-      expect(shouldTrigger).toBe(false);
-    });
-  });
-
-  describe('ProgressSummaryGenerator', () => {
-    it('should generate summary with correct format', async () => {
-      const task = createMockTask();
-      const generator = new ProgressSummaryGenerator();
-      const result = {
-        status: 'success',
-        output: 'test output line 1\ntest output line 2',
-        duration: 1234,
-      };
-
-      const summary = await generator.generate(task, result);
-
-      expect(summary).toContain('test output line 1');
-      expect(summary).toContain('test output line 2');
-      expect(summary).toContain('test-group');
-      expect(summary).toContain('success');
-      expect(summary).toContain('1234ms');
-    });
-
-    it('should save summary to correct location', async () => {
-      const task = createMockTask();
-      const generator = new ProgressSummaryGenerator();
-      const result = {
-        status: 'success',
-        output: 'test output',
-        duration: 1000,
-      };
-
-      await generator.save(task, await generator.generate(task, result));
-
-      const expectedPath = path.join(TEST_DIR, '.claude', 'progress-test-group.md');
-      expect(fs.existsSync(expectedPath)).toBe(true);
-
-      const content = fs.readFileSync(expectedPath, 'utf-8');
-      expect(content).toContain('test output');
-      expect(content).toContain('test-group');
-    });
-  });
-
-  describe('AgentSDKExecutor Integration', () => {
-    it('should execute task with hooks and rollover', async () => {
-      const task = createMockTask({
-        execution: {
-          rolloverStrategy: { maxExecutions: 3 },
-        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      manager.saveSession('group-2', {
+        sessionId: 's2',
+        mode: 'v2',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
 
-      const executor = new AgentSDKExecutor();
-      const result = await executor.execute(task);
-
-      expect(result.status).toBe('success');
-    });
-
-    it('should trigger rollover after threshold executions', async () => {
-      const manager = new SessionManager(TEST_DIR);
-      const executor = new AgentSDKExecutor();
-
-      // 第一次执行（2 次）
-      let task = createMockTask({
-        id: 'task-1',
-        execution: {
-          rolloverStrategy: { maxExecutions: 3 },
-        },
-      });
-
-      await executor.execute(task);
-
-      // 第二次执行（3 次，触发 rollover）
-      task = createMockTask({
-        id: 'task-2',
-        execution: {
-          rolloverStrategy: { maxExecutions: 3 },
-        },
-      });
-
-      await executor.execute(task);
-
-      // 验证 rollover 发生（执行次数重置为 0）
-      const state = JSON.parse(
-        fs.readFileSync(
-          path.join(TEST_DIR, 'states', 'test-group.json'),
-          'utf-8'
-        )
-      ) as any;
-
-      expect(state.executions).toBe(0);
-    });
-  });
-
-  describe('End-to-End Workflow', () => {
-    it('should complete full execution cycle with rollover', async () => {
-      const task = createMockTask({
-        execution: {
-          rolloverStrategy: { maxExecutions: 2 },
-          progressConfig: { enabled: true },
-        },
-      });
-
-      const executor = new AgentSDKExecutor();
-
-      // 执行多次，触发 rollover
-      for (let i = 0; i < 4; i++) {
-        await executor.execute(task);
-      }
-
-      // 验证进度文件生成
-      const progressPath = path.join(TEST_DIR, '.claude', 'progress-test-group.md');
-      expect(fs.existsSync(progressPath)).toBe(true);
+      const groups = manager.listGroups();
+      expect(groups).toContain('group-1');
+      expect(groups).toContain('group-2');
     });
   });
 });
