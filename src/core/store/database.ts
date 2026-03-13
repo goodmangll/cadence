@@ -14,6 +14,7 @@ export interface TaskFilter {
 
 export interface ExecutionFilter {
   taskId?: string;
+  sessionGroup?: string;
   status?: ExecutionStatus;
   startTime?: Date;
   endTime?: Date;
