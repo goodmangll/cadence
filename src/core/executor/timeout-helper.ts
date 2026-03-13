@@ -12,7 +12,6 @@ export class TimeoutHelper {
     }, timeoutMs);
 
     return {
-      signal: controller.signal,
       isAborted: () => controller.signal.aborted,
       cleanup: () => {
         if (timeoutId) {

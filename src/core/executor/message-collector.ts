@@ -1,4 +1,4 @@
-import { ExecutionResult } from '../models/execution';
+import { ExecutionResult } from '../../models/execution';
 
 /**
  * 统一消息收集器
