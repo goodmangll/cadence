@@ -13,11 +13,13 @@
     "status": "node dist/index.js status --daemon",
     "restart": "node dist/index.js restart",
     "logs": "node dist/index.js logs",
+    "cli": "node dist/index.js",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "verify": "pnpm run type-check && pnpm run lint && pnpm run build && pnpm run test"
+    "verify": "pnpm run type-check && pnpm run lint && pnpm run build && pnpm run test",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.4",
