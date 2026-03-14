@@ -1,0 +1,23 @@
+#!/bin/sh
+# pre-push hook - run type check and tests before pushing
+
+command -v pnpm >/dev/null 2>&1 || { echo "pnpm not found"; exit 1; }
+
+echo "Running pre-push checks..."
+
+echo "Running type check..."
+pnpm run type-check
+if [ $? -ne 0 ]; then
+  echo "Type check failed!"
+  exit 1
+fi
+
+echo "Running tests..."
+npx vitest --run
+if [ $? -ne 0 ]; then
+  echo "Tests failed!"
+  exit 1
+fi
+
+echo "All pre-push checks passed!"
+exit 0
