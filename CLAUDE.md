@@ -239,3 +239,65 @@ pnpm test --coverage
 - `src/core/executor/index.ts` - Command execution
 - `src/core/execution-store.ts` - Execution result storage
 - `src/models/task.ts` - Task data model
+
+---
+
+## Git Management
+
+### Branch Strategy
+- **Main branch**: `main` (production-ready code)
+- **Temporary branches**: `feature/*`, `fix/*`, `refactor/*`, `release/*`
+- **Worktree location**: `.worktrees/`
+
+### Commit Convention
+Uses [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Code style (formatting, no logic change)
+- `refactor`: Code refactoring
+- `perf`: Performance improvement
+- `test`: Adding/updating tests
+- `build`: Build system or dependencies
+- `ci`: CI/CD configuration
+- `chore`: Maintenance tasks
+- `revert`: Reverting previous commits
+
+**Examples:**
+```
+feat: add task scheduler support
+fix: resolve memory leak in executor
+docs: update API documentation
+refactor: simplify cron parser logic
+```
+
+### Tools
+
+- **husky**: Git hooks for commit validation
+- **commitlint**: Validates commit messages against Conventional Commits
+- **semantic-release**: Automated versioning and package publishing
+
+### Workflow
+
+1. Create a worktree for new feature:
+   ```bash
+   git worktree add .worktrees/feature-name -b feature/feature-name
+   ```
+
+2. Make changes and commit:
+   ```bash
+   git add .
+   git commit -m "feat: add new feature"
+   ```
+
+3. After completing work, use `superpowers:finishing-a-development-branch` to merge or create PR.
