@@ -28,17 +28,6 @@ export interface ExecutionConfig {
     schema: Record<string, unknown>;
   };
   sessionGroup?: string;
-
-  // 新增：Session 上下文管理配置
-  rolloverStrategy?: {
-    maxExecutions?: number;  // 每 N 次执行后 rollover
-    maxHours?: number;       // 每 N 小时后 rollover
-  };
-  progressConfig?: {
-    enabled?: boolean;       // 是否启用进度摘要
-    maxLength?: number;      // 输出摘要的最大字符数
-    outputPath?: string;    // 自定义输出路径
-  };
 }
 
 export interface Task {
