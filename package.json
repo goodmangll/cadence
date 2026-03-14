@@ -7,14 +7,13 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "node dist/index.js",
+    "dev": "node dist/index.js run",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@types/node-cron": "^3.0.11",
@@ -41,10 +40,5 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.0.0",
-  "pnpm": {
-    "overrides": {
-      "better-sqlite3": "11.8.0"
-    }
-  }
+  "packageManager": "pnpm@9.0.0"
 }

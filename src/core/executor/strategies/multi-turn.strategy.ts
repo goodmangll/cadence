@@ -28,7 +28,8 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
     collector: MessageCollector
   ): Promise<ExecutionResult> {
     const startTime = Date.now();
-    const timeoutMs = (task.execution.timeout || this.defaultTimeout) * 1000;
+    const timeout = task.execution.timeout ?? this.defaultTimeout;
+    const timeoutMs = timeout === -1 ? -1 : timeout * 1000;
     let executionError: Error | null = null;
     let timedOut = false;
 

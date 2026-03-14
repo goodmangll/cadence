@@ -24,8 +24,7 @@ export async function handleTaskCreate(options: any): Promise<void> {
     process.exit(1);
   }
 
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();
@@ -41,6 +40,7 @@ export async function handleTaskCreate(options: any): Promise<void> {
         command: options.command,
         workingDir: options.workingDir,
         settingSources: ['user', 'project', 'local'],
+        sessionGroup: options.sessionGroup,
       },
     });
 
@@ -59,8 +59,7 @@ export async function handleTaskCreate(options: any): Promise<void> {
 }
 
 export async function handleTaskList(): Promise<void> {
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();
@@ -88,8 +87,7 @@ export async function handleTaskList(): Promise<void> {
 }
 
 export async function handleTaskGet(id: string): Promise<void> {
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();
@@ -121,8 +119,7 @@ export async function handleTaskGet(id: string): Promise<void> {
 }
 
 export async function handleTaskDelete(id: string): Promise<void> {
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();
@@ -138,8 +135,7 @@ export async function handleTaskDelete(id: string): Promise<void> {
 }
 
 export async function handleTaskEnable(id: string): Promise<void> {
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();
@@ -155,8 +151,7 @@ export async function handleTaskEnable(id: string): Promise<void> {
 }
 
 export async function handleTaskDisable(id: string): Promise<void> {
-  const config = await loadConfig();
-  const manager = new TaskManager(config.storage.dbPath);
+  const manager = new TaskManager(process.cwd());
 
   try {
     await manager.init();

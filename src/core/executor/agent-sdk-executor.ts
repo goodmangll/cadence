@@ -22,7 +22,7 @@ export class AgentSDKExecutor {
   private multiTurnStrategy: MultiTurnSessionStrategy;
 
   constructor(options: AgentSDKExecutorOptions = {}) {
-    this.defaultTimeout = options.defaultTimeout || 300;
+    this.defaultTimeout = options.defaultTimeout ?? -1;
     this.sessionManager = new SessionManager();
 
     // 初始化策略

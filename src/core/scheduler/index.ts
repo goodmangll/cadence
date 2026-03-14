@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { Mutex } from 'async-mutex';
-import { TaskStore } from '../store/database';
+import { FileStore } from '../store/file-store';
 import { Task } from '../../models/task';
 import { parseCron, getNextRunTime, resolveAlias } from './cron-parser';
 import { logger } from '../../utils/logger';
@@ -12,15 +12,15 @@ interface ScheduledTask {
 }
 
 export class Scheduler {
-  private store: TaskStore;
+  private store: FileStore;
   private scheduledTasks: Map<string, ScheduledTask>;
   private running: boolean = false;
   private initialized: boolean = false;
   private onTaskTrigger?: (task: Task) => Promise<void>;
   private sessionLocks: Map<string, Mutex> = new Map();
 
-  constructor(dbPath?: string) {
-    this.store = new TaskStore(dbPath);
+  constructor(baseDir?: string) {
+    this.store = new FileStore(baseDir || process.cwd());
     this.scheduledTasks = new Map();
   }
 

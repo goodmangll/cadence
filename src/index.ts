@@ -38,6 +38,7 @@ taskCmd
   .option('--cron <expression>', 'Cron expression')
   .option('--command <command>', 'Command to execute')
   .option('--working-dir <path>', 'Working directory')
+  .option('--session-group <group>', 'Session group for shared context')
   .action(async (options) => {
     await handleTaskCreate(options);
   });

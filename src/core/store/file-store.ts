@@ -1,7 +1,17 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Task, TaskFilter } from '../../models/task';
-import { Execution } from '../../models/execution';
+import { Execution, ExecutionStatus } from '../../models/execution';
+
+export interface ExecutionFilter {
+  taskId?: string;
+  sessionGroup?: string;
+  status?: ExecutionStatus;
+  startTime?: Date;
+  endTime?: Date;
+  limit?: number;
+  offset?: number;
+}
 
 export class FileStore {
   private baseDir: string;
@@ -12,6 +22,14 @@ export class FileStore {
     this.baseDir = baseDir;
     this.tasksDir = path.join(baseDir, '.cadence', 'tasks');
     this.execDir = path.join(baseDir, '.cadence', 'executions');
+  }
+
+  async init(): Promise<void> {
+    // No-op for file store, directories are created as needed
+  }
+
+  async close(): Promise<void> {
+    // No-op for file store
   }
 
   private async ensureTasksDir(): Promise<void> {
@@ -28,13 +46,20 @@ export class FileStore {
     const filePath = path.join(this.tasksDir, `${id}.json`);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(content);
+      const task = JSON.parse(content);
+      // Restore Date objects
+      task.createdAt = new Date(task.createdAt);
+      task.updatedAt = new Date(task.updatedAt);
+      if (task.nextRunAt) {
+        task.nextRunAt = new Date(task.nextRunAt);
+      }
+      return task;
     } catch {
       return null;
     }
   }
 
-  async listTasks(filter?: TaskFilter): Promise<Task[]> {
+  async loadTasks(filter?: TaskFilter): Promise<Task[]> {
     try {
       await fs.access(this.tasksDir);
     } catch {
@@ -49,6 +74,12 @@ export class FileStore {
       try {
         const content = await fs.readFile(path.join(this.tasksDir, file), 'utf-8');
         const task = JSON.parse(content) as Task;
+        // Restore Date objects
+        task.createdAt = new Date(task.createdAt);
+        task.updatedAt = new Date(task.updatedAt);
+        if (task.nextRunAt) {
+          task.nextRunAt = new Date(task.nextRunAt);
+        }
         if (filter?.enabled !== undefined) {
           if (task.enabled !== filter.enabled) continue;
         }
@@ -81,29 +112,93 @@ export class FileStore {
     await fs.writeFile(filePath, JSON.stringify(execution, null, 2));
   }
 
-  async getExecutions(taskId: string, limit = 10): Promise<Execution[]> {
-    const execTaskDir = path.join(this.execDir, taskId);
+  async loadExecutions(filter?: ExecutionFilter): Promise<Execution[]> {
+    // First load all tasks if we need to filter by sessionGroup
+    const tasksBySessionGroup = new Map<string, Task>();
+    if (filter?.sessionGroup) {
+      const allTasks = await this.loadTasks();
+      for (const task of allTasks) {
+        if (task.execution.sessionGroup === filter.sessionGroup) {
+          tasksBySessionGroup.set(task.id, task);
+        }
+      }
+      // If no tasks match the session group, return empty
+      if (tasksBySessionGroup.size === 0) {
+        return [];
+      }
+    }
+
+    let allExecutions: Execution[] = [];
+
     try {
-      await fs.access(execTaskDir);
+      await fs.access(this.execDir);
     } catch {
       return [];
     }
 
-    const files = (await fs.readdir(execTaskDir))
-      .filter(f => f.endsWith('.json'))
-      .sort()
-      .reverse()
-      .slice(0, limit);
+    // Get all task directories in executions
+    let taskDirs: string[] = [];
+    if (filter?.taskId) {
+      taskDirs = [filter.taskId];
+    } else {
+      taskDirs = await fs.readdir(this.execDir);
+    }
 
-    const executions: Execution[] = [];
-    for (const file of files) {
+    for (const taskId of taskDirs) {
+      // If filtering by sessionGroup, skip tasks not in the group
+      if (filter?.sessionGroup && !tasksBySessionGroup.has(taskId)) {
+        continue;
+      }
+
+      const execTaskDir = path.join(this.execDir, taskId);
       try {
-        const content = await fs.readFile(path.join(execTaskDir, file), 'utf-8');
-        executions.push(JSON.parse(content));
+        const stat = await fs.stat(execTaskDir);
+        if (!stat.isDirectory()) continue;
+
+        const files = await fs.readdir(execTaskDir);
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
+          try {
+            const content = await fs.readFile(path.join(execTaskDir, file), 'utf-8');
+            const exec = JSON.parse(content);
+            // Restore Date objects
+            exec.startedAt = new Date(exec.startedAt);
+            if (exec.finishedAt) {
+              exec.finishedAt = new Date(exec.finishedAt);
+            }
+
+            // Apply filters
+            if (filter?.status && exec.status !== filter.status) {
+              continue;
+            }
+            if (filter?.startTime && exec.startedAt < filter.startTime) {
+              continue;
+            }
+            if (filter?.endTime && exec.startedAt > filter.endTime) {
+              continue;
+            }
+
+            allExecutions.push(exec);
+          } catch {
+            // Skip invalid files
+          }
+        }
       } catch {
-        // Skip invalid
+        // Skip invalid directories
       }
     }
-    return executions;
+
+    // Sort by startedAt descending
+    allExecutions.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+
+    // Apply limit and offset
+    if (filter?.offset) {
+      allExecutions = allExecutions.slice(filter.offset);
+    }
+    if (filter?.limit) {
+      allExecutions = allExecutions.slice(0, filter.limit);
+    }
+
+    return allExecutions;
   }
 }

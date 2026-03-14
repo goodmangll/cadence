@@ -44,7 +44,7 @@ describe('FileStore', () => {
     await store.saveTask(task1);
     await store.saveTask(task2);
 
-    const tasks = await store.listTasks();
+    const tasks = await store.loadTasks();
     expect(tasks).toHaveLength(2);
   });
 

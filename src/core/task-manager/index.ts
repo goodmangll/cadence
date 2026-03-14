@@ -1,14 +1,14 @@
-import { TaskStore, TaskFilter } from '../store/database';
-import { Task, createTask, validateTask } from '../../models/task';
+import { FileStore } from '../store/file-store';
+import { Task, TaskFilter, createTask, validateTask } from '../../models/task';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
 
 export class TaskManager {
-  private store: TaskStore;
+  private store: FileStore;
   private initialized: boolean = false;
 
-  constructor(dbPath?: string) {
-    this.store = new TaskStore(dbPath);
+  constructor(baseDir?: string) {
+    this.store = new FileStore(baseDir || process.cwd());
   }
 
   async init(): Promise<void> {

@@ -1,4 +1,4 @@
-import { TaskStore, ExecutionFilter } from '../core/store/database';
+import { FileStore, ExecutionFilter } from '../core/store/file-store';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { Execution } from '../models/execution';
@@ -20,8 +20,7 @@ function displayExecution(exec: Execution): void {
 }
 
 export async function handleLogs(options: any): Promise<void> {
-  const config = await loadConfig();
-  const store = new TaskStore(config.storage.dbPath);
+  const store = new FileStore(process.cwd());
 
   try {
     await store.init();
@@ -110,8 +109,7 @@ export async function handleLogs(options: any): Promise<void> {
 }
 
 export async function handleStats(): Promise<void> {
-  const config = await loadConfig();
-  const store = new TaskStore(config.storage.dbPath);
+  const store = new FileStore(process.cwd());
 
   try {
     await store.init();

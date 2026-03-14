@@ -13,7 +13,7 @@ export class Executor {
   private runningProcesses: Map<string, ReturnType<typeof spawn>>;
 
   constructor(options: ExecutorOptions = {}) {
-    this.defaultTimeout = options.defaultTimeout || 300; // 5 minutes default
+    this.defaultTimeout = options.defaultTimeout ?? -1; // -1 = never timeout
     this.runningProcesses = new Map();
   }
 
@@ -61,7 +61,8 @@ export class Executor {
   ): Promise<ExecutionResult> {
     return new Promise((resolve) => {
       const startTime = Date.now();
-      const timeout = task.execution.timeout || this.defaultTimeout;
+      const timeout = task.execution.timeout ?? this.defaultTimeout;
+      const hasTimeout = timeout !== -1;
 
       // Parse the command
       const [cmd, ...args] = task.execution.command.split(' ');
@@ -78,12 +79,15 @@ export class Executor {
       const proc = spawn(cmd, args, options);
       this.runningProcesses.set(task.id, proc);
 
-      // Set up timeout
-      const timeoutId = setTimeout(() => {
-        timedOut = true;
-        proc.kill('SIGKILL');
-        logger.warn('Task execution timed out', { taskId: task.id, timeout });
-      }, timeout * 1000);
+      // Set up timeout only if timeout is not -1
+      let timeoutId: NodeJS.Timeout | undefined;
+      if (hasTimeout) {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          proc.kill('SIGKILL');
+          logger.warn('Task execution timed out', { taskId: task.id, timeout });
+        }, timeout * 1000);
+      }
 
       proc.stdout?.on('data', (data) => {
         stdout += data.toString();
@@ -94,7 +98,9 @@ export class Executor {
       });
 
       proc.on('close', (code) => {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         this.runningProcesses.delete(task.id);
 
         const duration = Date.now() - startTime;
@@ -125,7 +131,9 @@ export class Executor {
       });
 
       proc.on('error', (error) => {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         this.runningProcesses.delete(task.id);
 
         const duration = Date.now() - startTime;
