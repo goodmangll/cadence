@@ -87,7 +87,7 @@ export async function handleLogs(options: LogOptions): Promise<void> {
         filter.startTime = lastTimestamp;
         filter.limit = undefined; // Get all new entries
       } else {
-        filter.limit = parseInt(options.limit, 10) || 10;
+        filter.limit = parseInt(options.limit || '10', 10) || 10;
       }
 
       const executions = await store.loadExecutions(filter);

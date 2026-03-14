@@ -127,19 +127,19 @@ export class FileTaskConfigLoader {
    */
   private convertToTaskConfig(taskConfig: RawTaskConfig): FileTaskConfig {
     // 解析 rolloverStrategy
-    const rolloverStrategy = taskConfig.rolloverStrategy
+    const rolloverStrategy = taskConfig.execution.rolloverStrategy
       ? {
-          maxExecutions: taskConfig.rolloverStrategy.maxExecutions || 10,
-          maxHours: taskConfig.rolloverStrategy?.maxHours || 168,
+          maxExecutions: taskConfig.execution.rolloverStrategy.maxExecutions || 10,
+          maxHours: taskConfig.execution.rolloverStrategy?.maxHours || 168,
         }
       : undefined;
 
     // 解析 progressConfig
-    const progressConfig = taskConfig.progressConfig
+    const progressConfig = taskConfig.execution.progressConfig
       ? {
-          enabled: taskConfig.progressConfig.enabled !== false,
-          maxLength: taskConfig.progressConfig.maxLength || 2000,
-          outputPath: taskConfig.progressConfig.outputPath,
+          enabled: taskConfig.execution.progressConfig.enabled !== false,
+          maxLength: taskConfig.execution.progressConfig.maxLength || 2000,
+          outputPath: taskConfig.execution.progressConfig.outputPath,
         }
       : undefined;
 
@@ -148,7 +148,7 @@ export class FileTaskConfigLoader {
       name: taskConfig.name,
       description: taskConfig.description,
       enabled: taskConfig.enabled ?? true,
-      trigger: this.parseTrigger(taskConfig.trigger),
+      trigger: this.parseTrigger(taskConfig.trigger as string | RawTriggerConfig),
       execution: {
         command: taskConfig.execution.command,
         workingDir: taskConfig.execution.workingDir,
@@ -156,7 +156,7 @@ export class FileTaskConfigLoader {
         settingSources: taskConfig.execution.settingSources || ['user', 'project', 'local'],
         allowedTools: taskConfig.execution.allowedTools,
         disallowedTools: taskConfig.execution.disallowedTools,
-        mcpServers: taskConfig.execution.mcpServers,
+        mcpServers: taskConfig.execution.mcpServers as Record<string, { command: string; args?: string[] }> | undefined,
         outputFormat: taskConfig.execution.outputFormat,
         sessionGroup: taskConfig.execution.sessionGroup,
         rolloverStrategy,

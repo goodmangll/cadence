@@ -17,7 +17,10 @@ export interface AgentSdkOptions {
   allowDangerouslySkipPermissions: boolean;
   mcpServers?: Record<string, unknown>;
   disallowedTools?: string[];
-  outputFormat?: string;
+  outputFormat?: {
+    type: 'json_schema';
+    schema: Record<string, unknown>;
+  };
 }
 
 /**
