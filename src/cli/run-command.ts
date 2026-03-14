@@ -3,9 +3,8 @@ import * as path from 'path';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
-import { TaskStore } from '../core/store/database';
+import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
-import { createExecution, finishExecution } from '../models/execution';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { TaskLoader } from '../core/task-loader';
@@ -17,12 +16,11 @@ export async function handleRun(): Promise<void> {
   const taskManager = new TaskManager(config.storage.dbPath);
   const scheduler = new Scheduler(config.storage.dbPath);
   const executor = new Executor({ defaultTimeout: config.scheduler.maxConcurrent });
-  const taskStore = new TaskStore(config.storage.dbPath);
+  const execStore = new ExecutionStore(process.cwd());
 
   // Initialize all components
   await taskManager.init();
   await scheduler.init();
-  await taskStore.init();
 
   logger.info('Cadence scheduler starting...');
 
@@ -54,17 +52,46 @@ export async function handleRun(): Promise<void> {
   await scheduler.start(async (task: Task) => {
     logger.info('Executing task', { taskId: task.id, name: task.name });
 
-    const execution = createExecution(task.id);
-    await taskStore.saveExecution(execution);
+    const startedAt = new Date();
 
     try {
       const result = await executor.execute(task);
-      const finished = finishExecution(execution, result);
-      await taskStore.saveExecution(finished);
+      const finishedAt = new Date();
+
+      // Save using ExecutionStore
+      await execStore.saveExecution(task.id, {
+        taskId: task.id,
+        status: result.status,
+        startedAt,
+        finishedAt,
+        durationMs: result.duration || (finishedAt.getTime() - startedAt.getTime()),
+        cost: result.cost,
+        output: result.output,
+        structured_output: result.structuredOutput,
+      });
+
+      logger.info('Task execution completed', {
+        taskId: task.id,
+        status: result.status,
+        duration: result.duration,
+      });
     } catch (error: unknown) {
+      const finishedAt = new Date();
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Save failed execution too
+      await execStore.saveExecution(task.id, {
+        taskId: task.id,
+        status: 'failed',
+        startedAt,
+        finishedAt,
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        output: errorMsg,
+      });
+
       logger.error('Task execution failed', {
         taskId: task.id,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMsg,
       });
     }
   });
@@ -74,7 +101,6 @@ export async function handleRun(): Promise<void> {
     logger.info('Received SIGINT, shutting down...');
     await scheduler.stop();
     await taskManager.close();
-    await taskStore.close();
     executor.close();
     process.exit(0);
   });
@@ -83,7 +109,6 @@ export async function handleRun(): Promise<void> {
     logger.info('Received SIGTERM, shutting down...');
     await scheduler.stop();
     await taskManager.close();
-    await taskStore.close();
     executor.close();
     process.exit(0);
   });
