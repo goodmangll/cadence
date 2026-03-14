@@ -9,3 +9,4 @@ local/
 *.sqlite
 *.db
 ./docs/plans/
+.worktrees/
