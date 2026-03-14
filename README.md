@@ -52,7 +52,7 @@ project/
 └── .cadence/
     ├── tasks/               # 任务定义
     │   └── {task-id}.yaml  # 每个任务一个 YAML 文件
-    ├── prompts/             # 命令文件（可被多个任务共享）
+    ├── prompts/             # 提示词文件（可被多个任务共享）
     │   └── {command}.md
     └── executions/          # 执行记录
         └── {task-id}/
@@ -73,7 +73,7 @@ cadence run --local
 ```
 ~/.cadence/
 ├── tasks/                  # 任务定义
-├── prompts/                # 命令文件
+├── prompts/                # 提示词文件
 ├── executions/             # 执行记录
 └── sessions/               # Session 数据
 ```
@@ -101,16 +101,16 @@ timezone: Asia/Shanghai  # 可选
 **必需字段：**
 - `name` - 任务名称
 - `cron` - cron 表达式
-- `commandFile` - 命令文件路径（相对于 YAML 文件）
+- `commandFile` - 提示词文件路径（相对于 YAML 文件）
 
 **可选字段：**
 - `description` - 任务描述
 - `enabled` - 是否启用（默认 true）
 - `timezone` - 时区
 
-### 命令文件
+### 提示词文件
 
-命令文件放在 `.cadence/prompts/` 目录下，内容可以是任何要执行的命令：
+提示词文件放在 `.cadence/prompts/` 目录下，内容可以是任何要执行的命令：
 
 ```markdown
 # .cadence/prompts/my-command.md
@@ -203,7 +203,7 @@ api:
 
 ### 执行配置（可选）
 
-在命令文件中可以指定执行选项：
+在提示词文件中可以指定执行选项：
 
 ```markdown
 # .cadence/prompts/my-command.md
@@ -226,7 +226,7 @@ echo "Hello from scheduled task!"
 # 1. 创建目录
 mkdir -p .cadence/tasks .cadence/prompts
 
-# 2. 创建命令文件
+# 2. 创建提示词文件
 echo 'echo "Current time: $(date)"' > .cadence/prompts/test-time.md
 
 # 3. 创建任务配置
