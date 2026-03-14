@@ -49,50 +49,31 @@ pnpm run lint
 pnpm run format
 ```
 
-### Running
+### Running (Development)
 
 ```bash
+# Use dev.sh script for development testing
+./dev.sh start    # Build and start scheduler in background
+./dev.sh stop     # Stop scheduler
+./dev.sh status   # Check if scheduler is running
+./dev.sh logs     # View execution logs
+./dev.sh error-logs   # View error logs
+./dev.sh test     # Run tests
+./dev.sh verify   # Full verification (type-check + lint + build + test)
+./dev.sh clean    # Clean temp files
+```
+
+Or use pnpm commands directly:
+
+```bash
+# Build project
+pnpm run build
+
 # Run scheduler in foreground
 pnpm run dev
-# or
-cadence run
-
-# Note: No API server or daemon commands implemented yet
 ```
 
-### Task Management
-
-```bash
-# Create task
-cadence task create --name "Daily Review" --cron "0 9 * * 1-5" --command "echo hello"
-
-# List tasks
-cadence task list
-
-# Get task details
-cadence task get <task-id>
-
-# Delete task
-cadence task delete <task-id>
-
-# Enable task
-cadence task enable <task-id>
-
-# Disable task
-cadence task disable <task-id>
-```
-
-### Query Commands
-
-```bash
-# View execution logs
-cadence logs
-cadence logs --task-id <task-id> --limit 10
-cadence logs -f  # Follow mode
-
-# View statistics
-cadence stats
-```
+**Note**: Task Management commands (e.g., `cadence task create`) are for production use only, not documented here.
 
 ---
 
@@ -216,17 +197,42 @@ The SessionManager exists at `src/core/session-manager/` but is not heavily inte
 
 ## Testing
 
-Tests are located in `tests/` directory and use Vitest.
+### Unit Tests
+
+Run unit tests with Vitest:
 
 ```bash
-# Run all tests
 pnpm test
-
-# Run specific test
 pnpm test src/core/scheduler/index.test.ts
-
-# Run with coverage
 pnpm test --coverage
+```
+
+### Development Testing (Real Execution)
+
+For realistic testing, use `dev.sh` to run the scheduler and verify task execution:
+
+```bash
+# 1. Start scheduler (builds + runs in background)
+./dev.sh start
+
+# 2. Create a test task by writing JSON to .cadence/tasks/
+# Format: {project}/.cadence/tasks/{task-id}.json
+# See src/models/task.ts for the Task schema
+
+# 3. Wait for task to trigger based on cron expression
+
+# 4. Check execution results directly:
+cat .cadence/executions/{task-id}/{timestamp}/result.json
+cat .cadence/executions/{task-id}/{timestamp}/output.md
+
+# 5. View logs
+./dev.sh logs
+./dev.sh error-logs
+```
+
+**Quick verification**:
+```bash
+./dev.sh verify   # Runs: type-check + lint + build + test
 ```
 
 ---
