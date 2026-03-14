@@ -63,7 +63,7 @@ project/
 
 启动时使用 `--local` 参数：
 ```bash
-cadence run --local
+cadence start --local
 ```
 
 ### 生产模式（全局）
@@ -79,7 +79,7 @@ cadence run --local
 ```
 
 ```bash
-cadence run
+cadence start
 ```
 
 ## 任务配置
@@ -148,11 +148,27 @@ cadence task disable <task-id>
 ### 调度器命令
 
 ```bash
-# 启动调度器
-cadence run
+# 启动调度器（前台运行）
+cadence start
+
+# 启动调度器（后台 daemon 模式）
+cadence start -d
+
+# 使用本地模式（项目目录）
+cadence start --local          # 前台
+cadence start -d --local       # 后台
+
+# 停止 daemon
+cadence stop
+
+# 查看 daemon 状态
+cadence status --daemon
+
+# 重启 daemon
+cadence restart
 ```
 
-启动后会一直运行，按任务配置的 Cron 时间执行。需要停止时按 `Ctrl+C`。
+启动后会一直运行，按任务配置的 Cron 时间执行。需要停止时按 `Ctrl+C` 或使用 `cadence stop`。
 
 ### 查询命令
 
@@ -310,6 +326,27 @@ pnpm run format
 
 # 代码检查
 pnpm run lint
+
+# 开发运行（前台）
+pnpm dev
+
+# 后台运行
+pnpm start
+
+# 停止
+pnpm stop
+
+# 查看状态
+pnpm status
+
+# 重启
+pnpm restart
+
+# 查看日志
+pnpm logs
+
+# 完整验证
+pnpm run verify
 ```
 
 ## 架构
