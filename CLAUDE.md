@@ -52,25 +52,29 @@ pnpm run format
 ### Running (Development)
 
 ```bash
-# Use dev.sh script for development testing
-./dev.sh start    # Build and start scheduler in background
-./dev.sh stop     # Stop scheduler
-./dev.sh status   # Check if scheduler is running
-./dev.sh logs     # View execution logs
-./dev.sh error-logs   # View error logs
-./dev.sh test     # Run tests
-./dev.sh verify   # Full verification (type-check + lint + build + test)
-./dev.sh clean    # Clean temp files
-```
-
-Or use pnpm commands directly:
-
-```bash
 # Build project
 pnpm run build
 
-# Run scheduler in foreground
-pnpm run dev
+# Run scheduler in foreground (development)
+pnpm dev
+
+# Run scheduler as daemon
+pnpm start
+
+# Stop daemon
+pnpm run stop
+
+# Check daemon status
+pnpm run status
+
+# Restart daemon
+pnpm run restart
+
+# View logs
+pnpm run logs
+
+# Run tests
+pnpm test
 ```
 
 **Note**: Task Management commands (e.g., `cadence task create`) are for production use only, not documented here.
