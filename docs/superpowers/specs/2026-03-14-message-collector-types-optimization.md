@@ -62,9 +62,13 @@ private collectAssistant(message: SDKAssistantMessage): void {
 }
 ```
 
-#### 2.2 User 消息处理 - 避免重复
+> **注**: `TextBlock` 需要从 `@anthropic-ai/sdk` 导入或本地定义。
+
+#### 2.2 User 消息处理 - 避免重复 + 处理数组
 
 **问题**: 当前代码同时处理 `message.message.content` 中的 tool_result 和 `tool_use_result`，可能导致重复。
+
+SDK 定义 `tool_result.content` 可以是 `string | list<dict> | null`，需要处理数组情况。
 
 ```typescript
 private collectUser(message: SDKUserMessage): void {
@@ -80,14 +84,28 @@ private collectUser(message: SDKUserMessage): void {
   for (const block of msgContent) {
     if (block.type === 'tool_result') {
       const content = block.content;
+
+      // 处理 content 为字符串
       if (typeof content === 'string' && content) {
         this.output += content + '\n';
         return; // 只取一次，避免重复
+      }
+
+      // 处理 content 为数组 (如 MCP 工具返回的复杂结果)
+      if (Array.isArray(content)) {
+        const text = content.map((item: any) =>
+          typeof item === 'string' ? item : JSON.stringify(item)
+        ).join('\n');
+        if (text) {
+          this.output += text + '\n';
+          return;
+        }
       }
     }
   }
 
   // 如果没有 tool_result，再尝试 tool_use_result
+  // SDK 定义为 unknown，需要类型断言
   if (message.tool_use_result) {
     const result = message.tool_use_result as { stdout?: string };
     if (result.stdout) {
@@ -101,7 +119,13 @@ private collectUser(message: SDKUserMessage): void {
 
 ```typescript
 private collectToolProgress(message: SDKToolProgressMessage): void {
+  // 使用更多字段
   this.output += `[${message.tool_name}] executing... (${message.elapsed_time_seconds}s)\n`;
+
+  // 可选：保存 tool_use_id 用于追踪
+  if (!this.toolUseId) {
+    this.toolUseId = message.tool_use_id;
+  }
 }
 ```
 
@@ -124,7 +148,9 @@ private collectResult(message: SDKResultMessage): void {
   this.cost = message.total_cost_usd;
   this.usage = message.usage;
   this.durationMs = message.duration_ms;
+  this.durationApiMs = message.duration_api_ms;
   this.numTurns = message.num_turns;
+  this.modelUsage = message.modelUsage;
 }
 ```
 
@@ -136,14 +162,30 @@ interface CollectedResult {
   cost: number | undefined;         // total_cost_usd
   structuredOutput: unknown;         // 结构化输出
   sessionId: string | null;         // session_id
-  usage?: {                         // token 使用量
+  toolUseId?: string;               // 首个 tool_use_id (来自 tool_progress)
+  usage?: {                         // token 使用量 (SDK: NonNullableUsage - 所有字段必需)
     inputTokens: number;
     outputTokens: number;
-    cacheReadInputTokens?: number;
-    cacheCreationInputTokens?: number;
+    cacheReadInputTokens: number;
+    cacheCreationInputTokens: number;
+    webSearchRequests: number;
+    costUSD: number;
+    contextWindow: number;
   };
-  durationMs?: number;              // 执行时长
-  numTurns?: number;                // 对话轮次
+  durationMs?: number;              // 执行时长 (duration_ms)
+  durationApiMs?: number;          // API 调用时长 (duration_api_ms)
+  numTurns?: number;               // 对话轮次
+  modelUsage?: {                    // 按模型的使用量
+    [modelName: string]: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadInputTokens: number;
+      cacheCreationInputTokens: number;
+      webSearchRequests: number;
+      costUSD: number;
+      contextWindow: number;
+    };
+  };
 }
 ```
 
@@ -151,9 +193,30 @@ interface CollectedResult {
 
 | 字段 | 类型 | 来源 | 说明 |
 |-----|------|------|------|
-| `usage` | `Usage` | `SDKResultMessage.usage` | Token 使用量 |
+| `usage` | `NonNullableUsage` | `SDKResultMessage.usage` | Token 使用量（所有字段必需） |
 | `durationMs` | `number` | `SDKResultMessage.duration_ms` | 执行时长 |
+| `durationApiMs` | `number` | `SDKResultMessage.duration_api_ms` | API 调用时长 |
 | `numTurns` | `number` | `SDKResultMessage.num_turns` | 对话轮次 |
+| `toolUseId` | `string` | `SDKToolProgressMessage.tool_use_id` | 工具执行 ID |
+| `modelUsage` | `object` | `SDKResultMessage.modelUsage` | 按模型的使用量 |
+
+### 5. 内部状态增强
+
+```typescript
+export class MessageCollector {
+  private output: string = '';
+  private cost: number | undefined;
+  private structuredOutput: unknown = undefined;
+  private sessionId: string | null = null;
+  private toolUseId: string | undefined;  // 新增
+  private usage: Usage | undefined;        // 新增 (SDK 类型)
+  private durationMs: number | undefined; // 新增
+  private durationApiMs: number | undefined; // 新增
+  private numTurns: number | undefined;    // 新增
+  private modelUsage: ModelUsage | undefined; // 新增
+  // ...
+}
+```
 
 ### 5. 测试策略
 
