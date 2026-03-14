@@ -67,7 +67,7 @@ start() {
     > "$ERROR_LOG_FILE" 2>/dev/null || true
 
     # 后台启动
-    pnpm run dev > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
+    pnpm run dev -- --local > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
     local pid=$!
     echo "$pid" > "$PID_FILE"
 

@@ -14,7 +14,7 @@ export interface ExecutionRecord {
     input_tokens: number;
     output_tokens: number;
   };
-  structured_output?: any;
+  structured_output?: unknown;
   outputFile?: string;
 }
 
@@ -26,7 +26,7 @@ export interface SaveExecutionParams {
   durationMs: number;
   cost?: number;
   usage?: { input_tokens: number; output_tokens: number };
-  structured_output?: any;
+  structured_output?: unknown;
   output?: string;
 }
 

@@ -1,16 +1,24 @@
 import { ExecutionStore, ExecutionFilter } from '../core/execution-store';
 import { FileStore } from '../core/store/file-store';
-import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 
-function getTimestampFromRecord(record: any): string {
+interface ExecutionRecord {
+  taskId: string;
+  startedAt: Date;
+  status: string;
+  durationMs: number;
+  cost?: number;
+  outputFile?: string;
+}
+
+function getTimestampFromRecord(record: ExecutionRecord): string {
   const date = record.startedAt instanceof Date ? record.startedAt : new Date(record.startedAt);
   return date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
 async function displayExecution(
   store: ExecutionStore,
-  record: any,
+  record: ExecutionRecord,
   verbose: boolean = false
 ): Promise<void> {
   const date = record.startedAt instanceof Date ? record.startedAt : new Date(record.startedAt);
@@ -36,7 +44,15 @@ async function displayExecution(
   console.log();
 }
 
-export async function handleLogs(options: any): Promise<void> {
+interface LogOptions {
+  taskId?: string;
+  limit?: string;
+  follow?: boolean;
+  verbose?: boolean;
+  v?: boolean;
+}
+
+export async function handleLogs(options: LogOptions): Promise<void> {
   const store = new ExecutionStore(process.cwd());
   const verbose = options.verbose || options.v;
 

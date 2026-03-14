@@ -100,7 +100,10 @@ export class SingletonLock {
         };
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code !== 'EEXIST') {
-          throw new SingletonLockError(`Failed to acquire lock: ${(err as Error).message}`, err);
+          const message = err && typeof err === 'object' && 'message' in err
+            ? String((err as { message: string }).message)
+            : String(err);
+          throw new SingletonLockError(`Failed to acquire lock: ${message}`, err as unknown as Error);
         }
 
         // Lock file exists - check if valid

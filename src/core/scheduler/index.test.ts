@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Scheduler } from './index';
 import { Task } from '../../models/task';
+import { FileStore } from '../store/file-store';
 import os from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
+
+// Test helper interface to access private store
+interface SchedulerWithStore {
+  store: FileStore;
+}
 
 describe('Scheduler', () => {
   let scheduler: Scheduler;
@@ -88,7 +94,8 @@ describe('Scheduler', () => {
 
   it('should load tasks from store on start', async () => {
     // Save a task directly to the store
-    const store = (scheduler as any).store;
+    const schedulerWithStore = scheduler as SchedulerWithStore;
+    const store = schedulerWithStore.store;
     const task: Task = {
       id: uuidv4(),
       name: 'Stored Task',

@@ -36,7 +36,7 @@ export class TaskLoader {
 
       try {
         const content = await fs.readFile(filePath, 'utf-8');
-        const config = yaml.load(content) as Record<string, any>;
+        const config = yaml.load(content) as Record<string, unknown>;
 
         // Validate required fields
         if (!config.name || !config.cron || !config.commandFile) {

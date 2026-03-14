@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { logger } from './utils/logger';
 import {
   handleTaskCreate,
   handleTaskList,
@@ -24,8 +23,9 @@ program
 program
   .command('run')
   .description('Start the scheduler (foreground)')
-  .action(async () => {
-    await handleRun();
+  .option('--local', 'Use local .cadence/ directory instead of global ~/.cadence/')
+  .action(async (options) => {
+    await handleRun(options);
   });
 
 // Task commands

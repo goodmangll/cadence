@@ -7,7 +7,7 @@ import { Config, RawConfig } from './types';
 import { logger } from '../utils/logger';
 
 // Convert snake_case keys to camelCase
-function camelCaseKeys(obj: any): any {
+function camelCaseKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
@@ -16,12 +16,12 @@ function camelCaseKeys(obj: any): any {
     return obj.map(camelCaseKeys);
   }
 
-  const result: Record<string, any> = {};
+  const result: Record<string, unknown> = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       // Convert snake_case to camelCase
       const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[camelKey] = camelCaseKeys(obj[key]);
+      result[camelKey] = camelCaseKeys((obj as Record<string, unknown>)[key]);
     }
   }
   return result;
@@ -86,8 +86,11 @@ export async function loadConfig(configPath?: string): Promise<Config> {
     logger.info('Configuration loaded from file', { path: configPath });
     return config;
   } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as any).code !== 'ENOENT') {
-      logger.warn('Failed to load config file, using defaults', { error: (error as Error).message });
+    if (error instanceof Error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if ('code' in nodeError && nodeError.code !== 'ENOENT') {
+        logger.warn('Failed to load config file, using defaults', { error: error.message });
+      }
     }
     logger.info('Using default configuration');
     return defaults;

@@ -1,6 +1,7 @@
 import { Task } from '../../../models/task';
 import { ExecutionResult } from '../../../models/execution';
 import { MessageCollector } from '../message-collector';
+import { AgentSdkOptions } from '../options-builder';
 
 /**
  * 执行策略接口
@@ -15,7 +16,7 @@ export interface ExecutionStrategy {
    */
   execute(
     task: Task,
-    options: any,
+    options: AgentSdkOptions,
     collector: MessageCollector
   ): Promise<ExecutionResult>;
 }

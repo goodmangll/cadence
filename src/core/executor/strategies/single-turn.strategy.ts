@@ -4,6 +4,7 @@ import { ExecutionResult } from '../../../models/execution';
 import { ExecutionStrategy } from './execution-strategy';
 import { MessageCollector } from '../message-collector';
 import { TimeoutHelper } from '../timeout-helper';
+import { AgentSdkOptions } from '../options-builder';
 
 /**
  * 单轮执行策略
@@ -18,7 +19,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
 
   async execute(
     task: Task,
-    options: any,
+    options: AgentSdkOptions,
     collector: MessageCollector
   ): Promise<ExecutionResult> {
     const startTime = Date.now();
@@ -31,7 +32,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
 
     try {
       await this.executeStream(task, options, collector, ctx);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
@@ -70,7 +71,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
 
   private async executeStream(
     task: Task,
-    options: any,
+    options: AgentSdkOptions,
     collector: MessageCollector,
     ctx: ReturnType<typeof TimeoutHelper.createExecutionContext>
   ): Promise<void> {

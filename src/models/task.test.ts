@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Task, validateTask, createTask } from './task';
 import { v4 as uuidv4 } from 'uuid';
-import { Execution, createExecution, finishExecution } from './execution';
+import { createExecution, finishExecution } from './execution';
 
 describe('Task Model', () => {
   it('should validate a valid task', () => {

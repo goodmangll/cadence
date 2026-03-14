@@ -96,8 +96,9 @@ export class FileStore {
     const filePath = path.join(this.tasksDir, `${id}.json`);
     try {
       await fs.unlink(filePath);
-    } catch (e: any) {
-      if (e.code !== 'ENOENT') {
+    } catch (e: unknown) {
+      const error = e as NodeJS.ErrnoException;
+      if (error.code !== 'ENOENT') {
         throw e;
       }
     }

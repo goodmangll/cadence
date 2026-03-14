@@ -8,5 +8,12 @@ coverage/
 local/
 *.sqlite
 *.db
-./docs/plans/
 .worktrees/
+
+# Local data and config
+.cadence/
+.claude/
+
+# Temporary test files
+setup-test.ts
+test-setup.ts

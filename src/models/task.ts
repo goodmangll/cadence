@@ -25,7 +25,7 @@ export interface ExecutionConfig {
   }>;
   outputFormat?: {
     type: 'json_schema';
-    schema: Record<string, any>;
+    schema: Record<string, unknown>;
   };
   sessionGroup?: string;
 

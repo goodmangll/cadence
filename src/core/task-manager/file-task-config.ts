@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { Task, Trigger } from '../../models/task';
+import { Trigger } from '../../models/task';
 
 /**
  * 基于文件的任务配置
@@ -15,7 +15,43 @@ export interface FileTaskConfig {
   enabled: boolean;
   trigger: Trigger;
   execution: FileExecutionConfig;
-  postActions?: any[];
+  postActions?: unknown[];
+}
+
+// YAML 文件中任务配置的原始格式
+interface RawTaskConfig {
+  id?: string;
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  trigger: unknown;
+  execution: {
+    command: string;
+    workingDir?: string;
+    timeout?: number;
+    settingSources?: string[];
+    allowedTools?: string[];
+    disallowedTools?: string[];
+    mcpServers?: unknown;
+    outputFormat?: string;
+    sessionGroup?: string;
+    rolloverStrategy?: {
+      maxExecutions?: number;
+      maxHours?: number;
+    };
+    progressConfig?: {
+      enabled?: boolean;
+      maxLength?: number;
+      outputPath?: string;
+    };
+  };
+  postActions?: unknown[];
+}
+
+interface RawTriggerConfig {
+  type?: string;
+  expression?: string;
+  timezone?: string;
 }
 
 export interface FileExecutionConfig {
@@ -29,7 +65,7 @@ export interface FileExecutionConfig {
     command: string;
     args?: string[];
   }>;
-  outputFormat?: any;
+  outputFormat?: string;
   sessionGroup?: string;
   rolloverStrategy?: {
     maxExecutions?: number;
@@ -72,13 +108,13 @@ export class FileTaskConfigLoader {
   private parseContent(content: string): FileTaskConfig[] {
     try {
       // 尝试解析为 YAML
-      const data = yaml.load(content) as any;
+      const data = yaml.load(content) as { tasks?: RawTaskConfig[] } | undefined;
 
       if (!data || !data.tasks) {
         throw new Error('Invalid task config: missing "tasks" field');
       }
 
-      const tasks = data.tasks as any[];
+      const tasks = data.tasks;
       return tasks.map((t) => this.convertToTaskConfig(t));
     } catch (error) {
       // 抛出真实错误
@@ -89,7 +125,7 @@ export class FileTaskConfigLoader {
   /**
    * 转换为内部配置格式
    */
-  private convertToTaskConfig(taskConfig: any): FileTaskConfig {
+  private convertToTaskConfig(taskConfig: RawTaskConfig): FileTaskConfig {
     // 解析 rolloverStrategy
     const rolloverStrategy = taskConfig.rolloverStrategy
       ? {
@@ -133,7 +169,7 @@ export class FileTaskConfigLoader {
   /**
    * 解析 trigger 配置
    */
-  private parseTrigger(trigger: any): Trigger {
+  private parseTrigger(trigger: RawTriggerConfig | string): Trigger {
     if (!trigger) {
       return { type: 'cron', expression: '* * * *' };
     }
@@ -145,7 +181,7 @@ export class FileTaskConfigLoader {
     if (trigger.type === 'cron') {
       return {
         type: 'cron',
-        expression: trigger.expression,
+        expression: trigger.expression || '* * * *',
         timezone: trigger.timezone,
       };
     }

@@ -4,16 +4,65 @@ import { ExecutionResult } from '../../models/execution';
  * 统一消息收集器
  * 负责收集和处理所有类型的消息
  */
+
+// 定义消息类型接口
+interface TextBlock {
+  type: 'text';
+  text: string;
+}
+
+interface ToolResultBlock {
+  type: 'tool_result';
+  content?: string;
+}
+
+interface MessageContent {
+  content: (TextBlock | ToolResultBlock)[];
+}
+
+interface AssistantMessage {
+  type: 'assistant';
+  message: MessageContent;
+}
+
+interface ToolProgressMessage {
+  type: 'tool_progress';
+  tool_name: string;
+}
+
+interface UserMessage {
+  type: 'user';
+  message?: MessageContent;
+  tool_use_result?: {
+    stdout?: string;
+  };
+}
+
+interface ResultMessage {
+  type: 'result';
+  subtype?: string;
+  result?: string;
+  errors?: string[];
+  structured_output?: unknown;
+  total_cost_usd?: number;
+}
+
+interface SystemMessage {
+  type: 'system';
+}
+
+type Message = AssistantMessage | ToolProgressMessage | UserMessage | ResultMessage | SystemMessage;
+
 export class MessageCollector {
   private output: string = '';
   private cost: number | undefined;
-  private structuredOutput: any = undefined;
+  private structuredOutput: unknown = undefined;
   private sessionId: string | null = null;
 
   /**
    * 收集并处理一条消息
    */
-  collect(message: any): void {
+  collect(message: Message): void {
     switch (message.type) {
       case 'assistant':
         this.collectAssistant(message);
@@ -27,9 +76,6 @@ export class MessageCollector {
       case 'result':
         this.collectResult(message);
         break;
-      case 'system':
-        this.collectSystem(message);
-        break;
     }
 
     // 提取 sessionId
@@ -38,51 +84,45 @@ export class MessageCollector {
     }
   }
 
-  private collectAssistant(message: any): void {
+  private collectAssistant(message: AssistantMessage): void {
     const text = message.message.content
-      .filter((block: any) => block.type === 'text')
-      .map((block: any) => block.text)
+      .filter((block): block is TextBlock => block.type === 'text')
+      .map((block) => block.text)
       .join('');
     if (text) {
       this.output += text + '\n';
     }
   }
 
-  private collectToolProgress(message: any): void {
+  private collectToolProgress(message: ToolProgressMessage): void {
     this.output += `[${message.tool_name}] executing...\n`;
   }
 
-  private collectUser(message: any): void {
+  private collectUser(message: UserMessage): void {
     // user 消息包含 tool_result（工具执行的实际输出）
-    const msgAny = message as any;
-    if (msgAny.message?.content) {
-      for (const block of msgAny.message.content) {
+    if (message.message?.content) {
+      for (const block of message.message.content) {
         if (block.type === 'tool_result' && block.content) {
           this.output += block.content + '\n';
         }
       }
     }
     // 也检查 tool_use_result 字段
-    if (msgAny.tool_use_result?.stdout) {
-      this.output += msgAny.tool_use_result.stdout + '\n';
+    if (message.tool_use_result?.stdout) {
+      this.output += message.tool_use_result.stdout + '\n';
     }
   }
 
-  private collectResult(message: any): void {
+  private collectResult(message: ResultMessage): void {
     if (message.subtype === 'success') {
       this.output += message.result || '';
     } else {
       this.output += message.errors?.join('\n') || 'Execution error';
     }
-    const resultMsg = message as any;
-    if (resultMsg.structured_output) {
-      this.structuredOutput = resultMsg.structured_output;
+    if (message.structured_output) {
+      this.structuredOutput = message.structured_output;
     }
     this.cost = message.total_cost_usd;
-  }
-
-  private collectSystem(message: any): void {
-    // 系统消息暂时不处理
   }
 
   /**

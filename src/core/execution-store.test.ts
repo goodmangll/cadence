@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { ExecutionStore } from './execution-store';
 import { v4 as uuidv4 } from 'uuid';
 

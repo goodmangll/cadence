@@ -8,6 +8,13 @@ import { ExecutionStrategy } from './execution-strategy';
 import { MessageCollector } from '../message-collector';
 import { TimeoutHelper } from '../timeout-helper';
 import { SessionManager } from '../../session-manager';
+import { AgentSdkOptions } from '../options-builder';
+
+interface Session {
+  send(message: string): Promise<void>;
+  stream(): AsyncIterable<unknown>;
+  close(): void;
+}
 
 /**
  * 多轮会话执行策略
@@ -24,7 +31,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
 
   async execute(
     task: Task,
-    options: any,
+    options: AgentSdkOptions,
     collector: MessageCollector
   ): Promise<ExecutionResult> {
     const startTime = Date.now();
@@ -36,7 +43,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
     const sessionGroup = task.execution.sessionGroup!;
     const sessionData = this.sessionManager.getSession(sessionGroup);
     const sessionId = sessionData?.sessionId;
-    let session: any = null;
+    let session: Session | null = null;
 
     const ctx = TimeoutHelper.createExecutionContext(timeoutMs);
 
@@ -62,7 +69,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
           updatedAt: new Date().toISOString(),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
@@ -107,7 +114,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
   }
 
   private async collectMessages(
-    session: any,
+    session: Session,
     collector: MessageCollector,
     ctx: ReturnType<typeof TimeoutHelper.createExecutionContext>
   ): Promise<void> {

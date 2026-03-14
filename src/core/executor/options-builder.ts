@@ -7,14 +7,28 @@ const DEFAULT_TOOLS = [
 ];
 
 /**
+ * Agent SDK 执行选项接口
+ */
+export interface AgentSdkOptions {
+  cwd?: string;
+  settingSources?: string[];
+  allowedTools: string[];
+  maxTurns: number;
+  allowDangerouslySkipPermissions: boolean;
+  mcpServers?: Record<string, unknown>;
+  disallowedTools?: string[];
+  outputFormat?: string;
+}
+
+/**
  * 统一选项构建器
  */
 export class OptionsBuilder {
   /**
    * 构建基础选项
    */
-  static build(task: Task): any {
-    const options: any = {
+  static build(task: Task): AgentSdkOptions {
+    const options: AgentSdkOptions = {
       cwd: task.execution.workingDir,
       settingSources: task.execution.settingSources,
       allowedTools: task.execution.allowedTools || DEFAULT_TOOLS,

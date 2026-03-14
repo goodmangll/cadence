@@ -1,10 +1,17 @@
 import { TaskManager } from '../core/task-manager';
-import { loadConfig } from '../config/loader';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { validateCron } from '../core/scheduler/cron-parser';
 
-export async function handleTaskCreate(options: any): Promise<void> {
+interface TaskCreateOptions {
+  name?: string;
+  cron?: string;
+  command?: string;
+  workingDir?: string;
+  sessionGroup?: string;
+}
+
+export async function handleTaskCreate(options: TaskCreateOptions): Promise<void> {
   if (!options.name) {
     console.error('Error: --name is required');
     process.exit(1);

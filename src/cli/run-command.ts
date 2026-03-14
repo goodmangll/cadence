@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
@@ -10,8 +11,22 @@ import { logger } from '../utils/logger';
 import { TaskLoader } from '../core/task-loader';
 import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
 
-export async function handleRun(): Promise<void> {
+interface RunOptions {
+  local?: boolean;
+}
+
+export async function handleRun(options: RunOptions = {}): Promise<void> {
   const config = await loadConfig();
+
+  // Determine base directory based on mode
+  // Production mode: ~/.cadence/ (pointing to .cadence directory itself)
+  // Development mode (--local): process.cwd()/.cadence/
+  const baseDir = options.local
+    ? path.join(process.cwd(), '.cadence')
+    : path.join(os.homedir(), '.cadence');
+
+  console.log(`Running in ${options.local ? 'local' : 'global'} mode`);
+  console.log(`Base directory: ${baseDir}`);
 
   // Acquire singleton lock FIRST
   const lock = new SingletonLock({ port: 9876 });
@@ -30,10 +45,10 @@ export async function handleRun(): Promise<void> {
   }
 
   // Initialize components
-  const taskManager = new TaskManager(process.cwd());
-  const scheduler = new Scheduler(process.cwd());
+  const taskManager = new TaskManager(baseDir);
+  const scheduler = new Scheduler(baseDir);
   const executor = new Executor({ defaultTimeout: config.scheduler.maxConcurrent });
-  const execStore = new ExecutionStore(process.cwd());
+  const execStore = new ExecutionStore(baseDir);
 
   // Initialize all components
   await taskManager.init();
@@ -42,8 +57,8 @@ export async function handleRun(): Promise<void> {
   logger.info('Cadence scheduler starting...');
 
   // Load tasks from .cadence/tasks/ directory
-  const baseDir = process.cwd();
-  const tasksDir = path.join(baseDir, '.cadence', 'tasks');
+  // baseDir already points to .cadence directory, so use it directly
+  const tasksDir = path.join(baseDir, 'tasks');
 
   try {
     await fs.access(tasksDir);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { loadConfig, Config } from './loader';
+import { loadConfig } from './loader';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';

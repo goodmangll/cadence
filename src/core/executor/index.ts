@@ -1,5 +1,4 @@
 import { Task } from '../../models/task';
-import { Execution, createExecution, finishExecution } from '../../models/execution';
 import { ExecutionResult } from '../../models/execution';
 import { logger } from '../../utils/logger';
 import { spawn } from 'child_process';
@@ -31,11 +30,10 @@ export class Executor {
   }
 
   async execute(task: Task): Promise<ExecutionResult> {
-    const execution = createExecution(task.id);
     logger.info('Executing task', { taskId: task.id, name: task.name });
 
     try {
-      const result = await this.executeCommand(task, execution);
+      const result = await this.executeCommand(task);
 
       logger.info('Task execution completed', {
         taskId: task.id,
@@ -56,8 +54,7 @@ export class Executor {
   }
 
   private async executeCommand(
-    task: Task,
-    execution: Execution
+    task: Task
   ): Promise<ExecutionResult> {
     return new Promise((resolve) => {
       const startTime = Date.now();
@@ -66,7 +63,11 @@ export class Executor {
 
       // Parse the command
       const [cmd, ...args] = task.execution.command.split(' ');
-      const options: any = {
+      const options: {
+        cwd: string;
+        shell: boolean;
+        stdio: ['pipe', 'pipe', 'pipe'];
+      } = {
         cwd: task.execution.workingDir || process.cwd(),
         shell: true,
         stdio: ['pipe', 'pipe', 'pipe'],

@@ -21,7 +21,7 @@ export interface ExecutionResult {
   error?: string;
   duration?: number;
   cost?: number;
-  structuredOutput?: any;
+  structuredOutput?: unknown;
 }
 
 export function createExecution(taskId: string): Execution {
