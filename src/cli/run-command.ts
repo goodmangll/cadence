@@ -3,21 +3,38 @@ import * as path from 'path';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
-import { TaskStore } from '../core/store/database';
+import { FileStore } from '../core/store/file-store';
 import { Task } from '../models/task';
 import { createExecution, finishExecution } from '../models/execution';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { TaskLoader } from '../core/task-loader';
+import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
 
 export async function handleRun(): Promise<void> {
   const config = await loadConfig();
 
+  // Acquire singleton lock FIRST
+  const lock = new SingletonLock({ port: 9876 });
+  let lockHandle: Awaited<ReturnType<typeof lock.acquire>> | undefined;
+  try {
+    lockHandle = await lock.acquire();
+  } catch (err) {
+    if (err instanceof SingletonLockError) {
+      console.error('Error:', err.message);
+      if (err.cause) {
+        console.error('Cause:', err.cause);
+      }
+      process.exit(1);
+    }
+    throw err;
+  }
+
   // Initialize components
-  const taskManager = new TaskManager(config.storage.dbPath);
-  const scheduler = new Scheduler(config.storage.dbPath);
+  const taskManager = new TaskManager(process.cwd());
+  const scheduler = new Scheduler(process.cwd());
   const executor = new Executor({ defaultTimeout: config.scheduler.maxConcurrent });
-  const taskStore = new TaskStore(config.storage.dbPath);
+  const taskStore = new FileStore(process.cwd());
 
   // Initialize all components
   await taskManager.init();
@@ -72,6 +89,7 @@ export async function handleRun(): Promise<void> {
   // Handle shutdown signals
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down...');
+    await lockHandle?.release();
     await scheduler.stop();
     await taskManager.close();
     await taskStore.close();
@@ -81,6 +99,7 @@ export async function handleRun(): Promise<void> {
 
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
+    await lockHandle?.release();
     await scheduler.stop();
     await taskManager.close();
     await taskStore.close();
