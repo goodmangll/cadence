@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { SingletonLock } from './singleton-lock';
-import * as net from 'net';
 
 describe('SingletonLock', () => {
   describe('acquire', () => {

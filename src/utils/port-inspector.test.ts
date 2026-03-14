@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { canConnectToPort, inspectPortUsage } from './port-inspector';
-import * as net from 'net';
 
 describe('port-inspector', () => {
   describe('canConnectToPort', () => {

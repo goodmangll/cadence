@@ -27,8 +27,8 @@ export function isPidAlive(pid: number): boolean {
       process.kill(pid, 0);
       return true;
     }
-  } catch (err: any) {
-    if (err.code === 'ESRCH') {
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ESRCH') {
       return false;
     }
     // For other errors, try fallback methods

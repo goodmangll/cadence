@@ -98,9 +98,9 @@ export class SingletonLock {
             await fs.rm(lockPath, { force: true });
           },
         };
-      } catch (err: any) {
-        if (err.code !== 'EEXIST') {
-          throw new SingletonLockError(`Failed to acquire lock: ${err.message}`, err);
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code !== 'EEXIST') {
+          throw new SingletonLockError(`Failed to acquire lock: ${(err as Error).message}`, err);
         }
 
         // Lock file exists - check if valid
