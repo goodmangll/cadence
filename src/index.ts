@@ -11,7 +11,6 @@ import {
 } from './cli/task-commands';
 import { handleRunTask } from './cli/run-task';
 import { handleCron } from './cli/cron-command';
-import { handleStatus } from './cli/status-command';
 import { handleLogs, handleStats } from './cli/query-commands';
 
 const program = new Command();
