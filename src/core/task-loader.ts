@@ -1,8 +1,22 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { Task, createTask } from '../models/task';
+import { Task, createTask, SettingSource } from '../models/task';
 import { validateCron } from './scheduler/cron-parser';
+
+interface TaskConfig {
+  name: string;
+  cron: string;
+  commandFile: string;
+  description?: string;
+  enabled?: boolean;
+  timezone?: string;
+  workingDir?: string;
+  settingSources?: SettingSource[];
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  mcpServers?: Record<string, { command: string; args?: string[] }>;
+}
 
 export interface TaskLoaderOptions {
   cadencedir?: string;
@@ -36,7 +50,7 @@ export class TaskLoader {
 
       try {
         const content = await fs.readFile(filePath, 'utf-8');
-        const config = yaml.load(content) as Record<string, unknown>;
+        const config = yaml.load(content) as TaskConfig;
 
         // Validate required fields
         if (!config.name || !config.cron || !config.commandFile) {

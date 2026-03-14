@@ -94,7 +94,7 @@ describe('Scheduler', () => {
 
   it('should load tasks from store on start', async () => {
     // Save a task directly to the store
-    const schedulerWithStore = scheduler as SchedulerWithStore;
+    const schedulerWithStore = scheduler as unknown as SchedulerWithStore;
     const store = schedulerWithStore.store;
     const task: Task = {
       id: uuidv4(),
