@@ -41,20 +41,45 @@ cadence run
 
 ## 数据存储
 
-任务和执行记录存储在项目目录的 `.cadence/` 目录下：
+Cadence 支持两种模式：
+
+### 开发模式（项目级）
+
+使用项目目录下的 `.cadence/` 目录：
 
 ```
 project/
 └── .cadence/
     ├── tasks/               # 任务定义
-    │   └── {task-id}.yaml   # 每个任务一个 YAML 文件
+    │   └── {task-id}.yaml  # 每个任务一个 YAML 文件
     ├── prompts/             # 命令文件（可被多个任务共享）
     │   └── {command}.md
     └── executions/          # 执行记录
         └── {task-id}/
             └── {timestamp}/
-                ├── result.json   # 执行结果
-                └── output.md     # 执行输出
+                ├── result.json
+                └── output.md
+```
+
+启动时使用 `--local` 参数：
+```bash
+cadence run --local
+```
+
+### 生产模式（全局）
+
+使用用户主目录下的 `.cadence/` 目录：
+
+```
+~/.cadence/
+├── tasks/                  # 任务定义
+├── prompts/                # 命令文件
+├── executions/             # 执行记录
+└── sessions/               # Session 数据
+```
+
+```bash
+cadence run
 ```
 
 ## 任务配置
