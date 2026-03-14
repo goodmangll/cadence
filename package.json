@@ -7,12 +7,17 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "node dist/index.js run",
+    "dev": "node dist/index.js start",
+    "start": "node dist/index.js start -d",
+    "stop": "node dist/index.js stop",
+    "status": "node dist/index.js status --daemon",
+    "restart": "node dist/index.js restart",
+    "logs": "node dist/index.js logs",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepare": "husky"
+    "verify": "pnpm run type-check && pnpm run lint && pnpm run build && pnpm run test"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.4",
