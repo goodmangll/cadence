@@ -40,15 +40,17 @@ progressConfig?: {
 
 ### 2. src/core/task-manager/file-task-config.ts
 
-移除相关解析逻辑：
-- 删除 `rolloverStrategy` 解析代码
-- 删除 `progressConfig` 解析代码
+1. 移除 `TaskConfigYAML` 接口中的废弃字段定义（第38-42行、第70-74行）
+2. 移除 `rolloverStrategy` 解析代码（第129-135行）
+3. 移除 `progressConfig` 解析代码（第137-144行）
 
-### 3. README.md
+### 3. src/models/task.ts
 
-更新配置说明：
-- 移除 `rolloverStrategy` 和 `progressConfig` 字段说明
-- 说明最终配置格式
+移除第32行的注释 `// 新增：Session 上下文管理配置`
+
+### 4. README.md
+
+> 注：README 中没有这两个字段的说明，无需更新
 
 ## 最终配置格式
 
@@ -75,8 +77,9 @@ timeout: 300               # 超时秒数
 
 ## 验收标准
 
-- [ ] 移除 `rolloverStrategy` 类型定义
-- [ ] 移除 `progressConfig` 类型定义
-- [ ] 移除 file-task-config.ts 中的解析逻辑
-- [ ] 更新 README 文档
+- [ ] 移除 `src/models/task.ts` 中的 `rolloverStrategy` 类型定义
+- [ ] 移除 `src/models/task.ts` 中的 `progressConfig` 类型定义
+- [ ] 移除 `src/models/task.ts` 中的注释 `// 新增：Session 上下文管理配置`
+- [ ] 移除 `src/core/task-manager/file-task-config.ts` 中 `TaskConfigYAML` 接口的废弃字段
+- [ ] 移除 `src/core/task-manager/file-task-config.ts` 中的解析逻辑
 - [ ] 所有测试通过
