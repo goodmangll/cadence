@@ -117,7 +117,9 @@ timezone: Asia/Shanghai  # 可选
 echo "Hello from scheduled task!"
 ```
 
-> 注意：虽然文件后缀是 `.md`，但执行时作为 shell 命令运行。
+> 注意：文件后缀是 `.md`，但执行方式取决于任务类型：
+> - Shell 模式：作为 shell 命令运行
+> - Agent SDK 模式：作为提示词（prompt）发送给 Claude
 
 ## 命令分类
 
