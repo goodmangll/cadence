@@ -30,6 +30,16 @@ export interface SaveExecutionParams {
   output?: string;
 }
 
+export interface ExecutionFilter {
+  taskId?: string;
+  sessionGroup?: string;
+  status?: 'success' | 'failed' | 'timeout';
+  startTime?: Date;
+  endTime?: Date;
+  limit?: number;
+  offset?: number;
+}
+
 export class ExecutionStore {
   private baseDir: string;
 
@@ -100,6 +110,9 @@ export class ExecutionStore {
       try {
         const content = await fs.readFile(resultPath, 'utf-8');
         const record = JSON.parse(content);
+        // Restore Date objects
+        record.startedAt = new Date(record.startedAt);
+        record.finishedAt = new Date(record.finishedAt);
         results.push(record);
       } catch {
         // Skip invalid entries
@@ -107,5 +120,93 @@ export class ExecutionStore {
     }
 
     return results;
+  }
+
+  async loadExecutions(filter: ExecutionFilter = {}): Promise<ExecutionRecord[]> {
+    const execBaseDir = path.join(this.baseDir, '.cadence', 'executions');
+
+    try {
+      await fs.access(execBaseDir);
+    } catch {
+      return [];
+    }
+
+    // Get task directories to scan
+    let taskDirs: string[] = [];
+    if (filter.taskId) {
+      taskDirs = [filter.taskId];
+    } else {
+      const entries = await fs.readdir(execBaseDir);
+      for (const entry of entries) {
+        const stat = await fs.stat(path.join(execBaseDir, entry));
+        if (stat.isDirectory()) {
+          taskDirs.push(entry);
+        }
+      }
+    }
+
+    let allExecutions: ExecutionRecord[] = [];
+
+    for (const taskId of taskDirs) {
+      const taskDir = path.join(execBaseDir, taskId);
+      try {
+        const entries = await fs.readdir(taskDir);
+        for (const entry of entries) {
+          const resultPath = path.join(taskDir, entry, 'result.json');
+          try {
+            const content = await fs.readFile(resultPath, 'utf-8');
+            const record = JSON.parse(content) as ExecutionRecord;
+
+            // Restore Date objects
+            record.startedAt = new Date(record.startedAt);
+            record.finishedAt = new Date(record.finishedAt);
+
+            // Apply filters
+            if (filter.status && record.status !== filter.status) continue;
+            if (filter.startTime && record.startedAt < filter.startTime) continue;
+            if (filter.endTime && record.startedAt > filter.endTime) continue;
+
+            allExecutions.push(record);
+          } catch {
+            // Skip invalid entries
+          }
+        }
+      } catch {
+        // Skip invalid task directories
+      }
+    }
+
+    // Sort by startedAt descending
+    allExecutions.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+
+    // Apply offset and limit
+    if (filter.offset) {
+      allExecutions = allExecutions.slice(filter.offset);
+    }
+    if (filter.limit) {
+      allExecutions = allExecutions.slice(0, filter.limit);
+    }
+
+    return allExecutions;
+  }
+
+  async getExecutionOutput(taskId: string, timestamp: string): Promise<string | null> {
+    const execDir = path.join(this.baseDir, '.cadence', 'executions', taskId, timestamp);
+
+    try {
+      // First check for result.json to get outputFile name
+      const resultPath = path.join(execDir, 'result.json');
+      const resultContent = await fs.readFile(resultPath, 'utf-8');
+      const result = JSON.parse(resultContent) as ExecutionRecord;
+
+      if (!result.outputFile) {
+        return null;
+      }
+
+      const outputPath = path.join(execDir, result.outputFile);
+      return await fs.readFile(outputPath, 'utf-8');
+    } catch {
+      return null;
+    }
   }
 }

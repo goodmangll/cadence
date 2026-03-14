@@ -86,6 +86,7 @@ program
   .option('--session-group <group>', 'Filter by session group')
   .option('--limit <number>', 'Limit number of entries', '10')
   .option('-f, --follow', 'Follow log output in real-time')
+  .option('-v, --verbose', 'Show full output')
   .action(async (options) => {
     await handleLogs(options);
   });

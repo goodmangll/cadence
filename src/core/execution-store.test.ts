@@ -62,4 +62,60 @@ describe('ExecutionStore', () => {
 
     expect(executions).toHaveLength(2);
   });
+
+  it('should load executions with filters', async () => {
+    const now = new Date();
+    await store.saveExecution('task-1', {
+      taskId: 'task-1',
+      status: 'success',
+      startedAt: now,
+      finishedAt: now,
+      durationMs: 1000,
+      output: 'test 1',
+    });
+
+    await store.saveExecution('task-2', {
+      taskId: 'task-2',
+      status: 'failed',
+      startedAt: new Date(now.getTime() + 1000),
+      finishedAt: new Date(now.getTime() + 2000),
+      durationMs: 1000,
+      output: 'test 2',
+    });
+
+    // Test filter by taskId
+    let executions = await store.loadExecutions({ taskId: 'task-1' });
+    expect(executions).toHaveLength(1);
+    expect(executions[0].taskId).toBe('task-1');
+
+    // Test filter by status
+    executions = await store.loadExecutions({ status: 'failed' });
+    expect(executions).toHaveLength(1);
+    expect(executions[0].status).toBe('failed');
+
+    // Test limit
+    executions = await store.loadExecutions({ limit: 1 });
+    expect(executions).toHaveLength(1);
+  });
+
+  it('should get execution output', async () => {
+    const now = new Date();
+    await store.saveExecution('task-1', {
+      taskId: 'task-1',
+      status: 'success',
+      startedAt: now,
+      finishedAt: now,
+      durationMs: 1000,
+      output: 'Hello, World!',
+    });
+
+    const executions = await store.listExecutions('task-1');
+    expect(executions).toHaveLength(1);
+
+    // Extract timestamp from outputFile path or result
+    const timestamp = executions[0].startedAt.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const output = await store.getExecutionOutput('task-1', timestamp);
+
+    expect(output).toBe('Hello, World!');
+  });
 });
