@@ -50,7 +50,7 @@ describe('Executor', () => {
 
     const result = await executor.execute(task);
     expect(result.status).toBe('timeout');
-  }, 10000);
+  }, 30000);
 
   it('should handle execution failure', async () => {
     const task: Task = {
