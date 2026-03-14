@@ -41,19 +41,85 @@ cadence run
 
 ## 数据存储
 
-任务和执行记录存储在项目目录的 `.cadence/` 目录下：
+Cadence 支持两种模式：
+
+### 开发模式（项目级）
+
+使用项目目录下的 `.cadence/` 目录：
 
 ```
-.cadence/
-├── config.yaml          # 任务配置文件（可选，支持 YAML）
-├── tasks/               # 任务定义
-│   └── {task-id}.json   # 每个任务一个 JSON 文件
-└── executions/          # 执行记录
-    └── {task-id}/
-        └── {timestamp}/
-            ├── result.json   # 执行结果
-            └── output.md     # 执行输出
+project/
+└── .cadence/
+    ├── tasks/               # 任务定义
+    │   └── {task-id}.yaml  # 每个任务一个 YAML 文件
+    ├── prompts/             # 提示词文件（可被多个任务共享）
+    │   └── {command}.md
+    └── executions/          # 执行记录
+        └── {task-id}/
+            └── {timestamp}/
+                ├── result.json
+                └── output.md
 ```
+
+启动时使用 `--local` 参数：
+```bash
+cadence run --local
+```
+
+### 生产模式（全局）
+
+使用用户主目录下的 `.cadence/` 目录：
+
+```
+~/.cadence/
+├── tasks/                  # 任务定义
+├── prompts/                # 提示词文件
+├── executions/             # 执行记录
+└── sessions/               # Session 数据
+```
+
+```bash
+cadence run
+```
+
+## 任务配置
+
+### 方式一：YAML 文件（推荐）
+
+在项目的 `.cadence/tasks/` 目录下创建 YAML 文件：
+
+```yaml
+# .cadence/tasks/my-task.yaml
+name: My Task
+description: 任务描述
+cron: "0 9 * * *"
+commandFile: ../prompts/my-command.md
+enabled: true
+timezone: Asia/Shanghai  # 可选
+```
+
+**必需字段：**
+- `name` - 任务名称
+- `cron` - cron 表达式
+- `commandFile` - 提示词文件路径（相对于 YAML 文件）
+
+**可选字段：**
+- `description` - 任务描述
+- `enabled` - 是否启用（默认 true）
+- `timezone` - 时区
+
+### 提示词文件
+
+提示词文件放在 `.cadence/prompts/` 目录下，内容可以是任何要执行的命令：
+
+```markdown
+# .cadence/prompts/my-command.md
+echo "Hello from scheduled task!"
+```
+
+> 注意：文件后缀是 `.md`，但执行方式取决于任务类型：
+> - Shell 模式：作为 shell 命令运行
+> - Agent SDK 模式：作为提示词（prompt）发送给 Claude
 
 ## 命令分类
 
@@ -137,62 +203,79 @@ api:
   addr: "127.0.0.1:8080"
 ```
 
-## YAML 任务配置（可选）
+### 执行配置（可选）
 
-除了 CLI 创建任务外，还可以使用 YAML 配置文件：
+在提示词文件中可以指定执行选项：
+
+```markdown
+# .cadence/prompts/my-command.md
+#sessionGroup: my-group
+#workingDir: /path/to/project
+#timeout: 300
+echo "Hello from scheduled task!"
+```
+
+**可选配置：**
+- `#sessionGroup` - 共享 session 的组名（用于多轮对话）
+- `#workingDir` - 工作目录
+- `#timeout` - 超时时间（秒）
+
+### 完整示例
+
+创建一个每 30 秒输出时间的测试任务：
+
+```bash
+# 1. 创建目录
+mkdir -p .cadence/tasks .cadence/prompts
+
+# 2. 创建提示词文件
+echo 'echo "Current time: $(date)"' > .cadence/prompts/test-time.md
+
+# 3. 创建任务配置
+cat > .cadence/tasks/test-time.yaml << 'EOF'
+name: Test Time
+description: 每隔30秒输出当前时间
+cron: "*/30 * * * * *"
+commandFile: ../prompts/test-time.md
+enabled: true
+EOF
+
+# 4. 启动调度器
+cadence run
+```
+
+## 旧版配置方式
+
+以下配置方式已废弃，请使用上面的 YAML 文件方式：
 
 ```yaml
-# .cadence/config.yaml
+# .cadence/config.yaml（旧版，已废弃）
 tasks:
   - name: "Daily Review"
     cron: "0 9 * * 1-5"
-    command: "echo 'Review yesterday\\'s work'"
-    enabled: true
-
-  - name: "Health Check"
-    cron: "*/5 * * * *"
-    command: "curl -s http://localhost:3000/health"
+    command: "echo 'Review yesterday\'s work'"
     enabled: true
 ```
 
-## 完整示例
+## Session 共享
 
-### 示例：每天早上 9 点执行代码审查
+如果多个任务需要共享上下文，可以配置 `sessionGroup`：
 
-```bash
-# 1. 创建任务
-cadence task create \
-  --name "Morning Code Review" \
-  --cron "0 9 * * 1-5" \
-  --command "cd /path/to/project && git diff --stat"
+```yaml
+# .cadence/tasks/task1.yaml
+name: Task 1
+cron: "0 9 * * *"
+commandFile: ../prompts/step1.md
+sessionGroup: my-group  # 相同组名共享 session
 
-# 2. 启动调度器
-cadence run
+# .cadence/tasks/task2.yaml
+name: Task 2
+cron: "0 10 * * *"
+commandFile: ../prompts/step2.md
+sessionGroup: my-group  # 与 task1 共享 session
 ```
 
-调度器启动后，每天早上 9 点（周一到周五）会自动执行 `git diff --stat` 命令。
-
-### 示例：每 5 分钟健康检查
-
-```bash
-cadence task create \
-  --name "Health Check" \
-  --cron "*/5 * * * *" \
-  --command "curl -s http://localhost:3000/health"
-
-cadence run
-```
-
-### 示例：使用 Claude Agent SDK 执行任务
-
-```bash
-# 配置 API 密钥后，可以使用 Agent 模式
-cadence task create \
-  --name "AI Code Review" \
-  --cron "0 10 * * 1-5" \
-  --command "Review recent changes" \
-  --agent true
-```
+> 注意：Session 共享依赖 Agent SDK 的自动压缩机制。
 
 ## Cron 表达式
 
