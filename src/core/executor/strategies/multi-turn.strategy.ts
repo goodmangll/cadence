@@ -1,6 +1,8 @@
 import {
   unstable_v2_createSession,
   unstable_v2_resumeSession,
+  SDKSessionOptions,
+  SDKMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import { Task } from '../../../models/task';
 import { ExecutionResult } from '../../../models/execution';
@@ -50,8 +52,8 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
     try {
       // 创建或恢复 session
       session = sessionId
-        ? unstable_v2_resumeSession(sessionId, options)
-        : unstable_v2_createSession(options);
+        ? unstable_v2_resumeSession(sessionId, options as unknown as SDKSessionOptions)
+        : unstable_v2_createSession(options as unknown as SDKSessionOptions);
 
       // 发送命令
       await session.send(task.execution.command);
@@ -73,7 +75,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
       if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
-        executionError = error;
+        executionError = error instanceof Error ? error : new Error(String(error));
       }
     } finally {
       ctx.cleanup();
@@ -122,7 +124,7 @@ export class MultiTurnSessionStrategy implements ExecutionStrategy {
       if (ctx.isTimedOut()) {
         throw new Error('Command timed out');
       }
-      collector.collect(msg);
+      collector.collect(msg as SDKMessage);
     }
   }
 }

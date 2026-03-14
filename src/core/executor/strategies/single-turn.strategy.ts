@@ -36,7 +36,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
       if (ctx.isTimedOut() || String(error).includes('timed out')) {
         timedOut = true;
       } else {
-        executionError = error;
+        executionError = error instanceof Error ? error : new Error(String(error));
       }
     } finally {
       ctx.cleanup();
@@ -77,7 +77,7 @@ export class SingleTurnExecutionStrategy implements ExecutionStrategy {
   ): Promise<void> {
     for await (const message of query({
       prompt: task.execution.command,
-      options,
+      options: options as Parameters<typeof query>[0]['options'],
     })) {
       if (ctx.isTimedOut()) {
         throw new Error('Command timed out');
