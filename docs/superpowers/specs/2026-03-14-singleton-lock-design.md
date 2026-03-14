@@ -3,11 +3,11 @@
 **Date**: 2026-03-14
 **Author**: Claude Code
 **Status**: Draft
-**Reference**: Inspired by [OpenClaw Gateway Lock](https://docs.openclaw.ai/gateway/gateway-lock)
+**Reference**: [OpenClaw Gateway Lock](https://github.com/openclaw/openclaw/blob/main/src/infra/gateway-lock.ts)
 
 ## 1. Overview
 
-Prevent multiple Cadence scheduler instances from running simultaneously by implementing an application-level singleton lock mechanism using TCP port binding.
+Prevent multiple Cadence scheduler instances from running simultaneously using a **dual-layer lock mechanism** (PID file lock + port probing), inspired by OpenClaw's robust implementation.
 
 ## 2. Problem Statement
 
@@ -16,169 +16,329 @@ Currently, users can start multiple `cadence run` processes, leading to:
 - Conflicting writes to execution records
 - Resource contention
 
-## 3. Solution: TCP Port Binding (OpenClaw-style)
+## 3. Solution: Dual-Layer Lock (OpenClaw-style)
 
-### 3.1 Approach
-
-Use TCP port binding on `127.0.0.1:9876` (configurable) to ensure exclusive access:
-- **Lock acquisition**: Bind the port - success means lock acquired
-- **Lock release**: OS automatically releases the port on process exit (including crashes/SIGKILL)
-- **Future compatibility**: The lock mechanism is separate from any future API server
-
-### 3.2 Architecture: Lock and API Server Separation
+### 3.1 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Startup Flow                         │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  1. Try to bind dummy TCP server on 127.0.0.1:9876   │
-│     ├─ Success → acquire lock, continue                  │
-│     └─ Fail → another instance running, exit            │
-│                                                           │
-│  2. Start scheduler                                       │
-│                                                           │
-│  3. (Future) Close dummy server, start real API server  │
-│     on the same port                                      │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Startup Flow                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Try to acquire PID file lock (atomic)                   │
+│     ├─ Success → write PID + metadata, continue             │
+│     └─ Fail → go to step 2                                  │
+│                                                              │
+│  2. Check if existing lock is valid                         │
+│     ├─ Is PID alive?                                        │
+│     ├─ Can we connect to the port?                          │
+│     ├─ (Linux only) Is cmdline matching Cadence?           │
+│     └─ Is lock file stale (>30s)?                           │
+│                                                              │
+│  3. If lock is stale → delete and retry                      │
+│     If lock is valid → exit with error                       │
+│                                                              │
+│  4. Start the TCP server on port 9876 (for future API)     │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.3 Components
+### 3.2 Components
 
-#### SingletonLock Class (`src/utils/singleton-lock.ts`)
+#### 1. SingletonLock Class (`src/utils/singleton-lock.ts`)
+
+**Main API:**
 
 ```typescript
-import * as net from 'net';
+export interface LockHandle {
+  lockPath: string;
+  release: () => Promise<void>;
+}
 
-const DEFAULT_PORT = 9876;
-const DEFAULT_HOST = '127.0.0.1';
+export interface SingletonLockOptions {
+  port?: number;
+  host?: string;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  staleMs?: number;
+}
+
+export class SingletonLockError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'SingletonLockError';
+  }
+}
 
 export class SingletonLock {
-  private server: net.Server | null = null;
   private port: number;
   private host: string;
+  private timeoutMs: number;
+  private pollIntervalMs: number;
+  private staleMs: number;
+  private server: net.Server | null = null;
+  private lockHandle: LockHandle | null = null;
 
-  constructor(port: number = DEFAULT_PORT, host: string = DEFAULT_HOST) {
-    this.port = port;
-    this.host = host;
-  }
+  constructor(options: SingletonLockOptions = {})
 
   /**
-   * Try to acquire the lock by binding the TCP port
-   * @returns true if lock acquired, false if another instance is running
+   * Try to acquire the lock
+   * @returns LockHandle if acquired, throws SingletonLockError if failed
    */
-  async acquire(): Promise<boolean>
+  async acquire(): Promise<LockHandle>
 
   /**
-   * Release the lock by closing the server
+   * Release the lock
    */
   async release(): Promise<void>
 
   /**
-   * Get the port being used
+   * Check if port is in use and try to identify the owner
    */
-  getPort(): number
+  private async inspectPort(): Promise<PortInspectionResult>
 
   /**
-   * Get the host being used
+   * Check if a PID is alive and is a Cadence process
    */
-  getHost(): string
+  private async isCadenceProcess(pid: number): Promise<boolean>
 }
 ```
 
-### 3.4 Integration Points
+#### 2. Port Inspection (`src/utils/port-inspector.ts`)
+
+Helper module to check port usage:
+
+```typescript
+export interface PortListener {
+  pid?: number;
+  processName?: string;
+  commandLine?: string;
+}
+
+export interface PortInspectionResult {
+  isPortInUse: boolean;
+  listeners: PortListener[];
+  isCadence: boolean;  // true if looks like Cadence
+}
+
+export async function inspectPortUsage(
+  port: number,
+  host: string = '127.0.0.1'
+): Promise<PortInspectionResult>
+
+export async function canConnectToPort(
+  port: number,
+  host: string = '127.0.0.1',
+  timeoutMs: number = 1000
+): Promise<boolean>
+```
+
+#### 3. PID File Format (`~/.cadence/scheduler.lock`)
+
+```json
+{
+  "pid": 12345,
+  "createdAt": "2026-03-14T10:00:00.000Z",
+  "workingDir": "/home/linden/area/code/mine/cadence"
+}
+```
+
+### 3.3 Lock Acquisition Flow (Detailed)
+
+```typescript
+// Pseudocode of acquire()
+async acquire(): Promise<LockHandle> {
+  const startedAt = Date.now();
+  const lockPath = resolveLockPath();
+
+  while (Date.now() - startedAt < this.timeoutMs) {
+    try {
+      // 1. Atomic create with "wx" flag (fails if exists)
+      const handle = await fs.open(lockPath, "wx");
+
+      // 2. Write lock payload
+      const payload = {
+        pid: process.pid,
+        createdAt: new Date().toISOString(),
+        workingDir: process.cwd(),
+      };
+      await handle.writeFile(JSON.stringify(payload));
+
+      // 3. Start TCP server (for future API + verification)
+      this.server = net.createServer();
+      await new Promise((resolve, reject) => {
+        this.server!.listen(this.port, this.host);
+        this.server!.on('listening', resolve);
+        this.server!.on('error', reject);
+      });
+
+      // 4. Return handle
+      return {
+        lockPath,
+        release: async () => {
+          this.server?.close();
+          await handle.close();
+          await fs.rm(lockPath, { force: true });
+        }
+      };
+    } catch (err) {
+      if (err.code !== 'EEXIST') {
+        throw new SingletonLockError('Failed to acquire lock', err);
+      }
+
+      // Lock file exists - check if it's valid
+      const isLockValid = await this.isLockValid(lockPath);
+
+      if (!isLockValid) {
+        // Stale lock - delete and retry
+        await fs.rm(lockPath, { force: true });
+        continue;
+      }
+
+      // Lock is valid - wait and retry
+      await new Promise(r => setTimeout(r, this.pollIntervalMs));
+    }
+  }
+
+  throw new SingletonLockError('Timeout acquiring lock');
+}
+```
+
+### 3.4 Lock Validation Logic
+
+| Check | Description |
+|-------|-------------|
+| **PID alive?** | Use OS-specific method to check if PID exists |
+| **Port responds?** | Try to connect to 127.0.0.1:9876 |
+| **Process is Cadence?** | (Linux) Check `/proc/{pid}/cmdline`; (macOS) `ps -p {pid}` |
+| **Lock file stale?** | Check if lock file is older than `staleMs` (30s) |
+
+### 3.5 Integration Points
 
 #### `src/cli/run-command.ts`
 
-1. Acquire lock before starting scheduler:
 ```typescript
-import { SingletonLock } from '../utils/singleton-lock';
+import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
 
-// At the beginning of handleRun()
-const lock = new SingletonLock();
-const acquired = await lock.acquire();
-if (!acquired) {
-  console.error('Error: Another Cadence scheduler is already running');
-  console.error(`(Port ${lock.getHost()}:${lock.getPort()} is already in use)`);
-  process.exit(1);
+export async function handleRun(): Promise<void> {
+  const config = await loadConfig();
+
+  // Acquire singleton lock FIRST
+  const lock = new SingletonLock({ port: 9876 });
+  let lockHandle: LockHandle | undefined;
+  try {
+    lockHandle = await lock.acquire();
+  } catch (err) {
+    if (err instanceof SingletonLockError) {
+      console.error('Error:', err.message);
+      if (err.cause) {
+        console.error('Cause:', err.cause);
+      }
+      process.exit(1);
+    }
+    throw err;
+  }
+
+  // ... rest of handleRun() ...
+
+  // Setup cleanup
+  const cleanup = async () => {
+    await lockHandle?.release();
+    await scheduler.stop();
+    // ... other cleanup ...
+  };
+
+  process.on('SIGINT', async () => {
+    await cleanup();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await cleanup();
+    process.exit(0);
+  });
+
+  process.on('exit', () => {
+    // Best effort cleanup
+    try {
+      fs.rmSync(lockHandle?.lockPath!, { force: true });
+    } catch {}
+  });
 }
 ```
 
-2. Release lock on exit:
-```typescript
-process.on('SIGINT', async () => {
-  await lock.release();
-  // ... existing cleanup
-});
+### 3.6 Error Messages
 
-process.on('SIGTERM', async () => {
-  await lock.release();
-  // ... existing cleanup
-});
+**Case 1: Another Cadence instance running**
+```
+Error: Another Cadence scheduler is already running (PID 12345)
+Port 127.0.0.1:9876 is in use by Cadence
+Resolve by stopping the process or using --port <free-port>
 ```
 
-### 3.5 Future API Server Integration
-
-When adding an API server later:
-
-```typescript
-// Pattern for future API integration
-const lock = new SingletonLock();
-if (!(await lock.acquire())) {
-  process.exit(1);
-}
-
-// ... start scheduler ...
-
-// When ready to enable API:
-lock.release(); // Close dummy server
-
-// Start real API server on the same port
-const app = express(); // Or Koa, Fastify, etc.
-app.get('/tasks', ...);
-app.listen(lock.getPort(), lock.getHost());
+**Case 2: Port occupied by another program**
+```
+Error: Port 127.0.0.1:9876 is already in use
+Port listener: node (PID 67890)
+Resolve by freeing the port or using --port <free-port>
 ```
 
-## 4. Why This Approach (vs PID File)
+## 4. Why This Approach
 
-| Aspect | PID File | TCP Port Binding |
-|--------|----------|-----------------|
-| Crash resilience | ❌ May leave stale files | ✅ OS auto-releases |
-| Implementation | Needs process validation | Simple bind check |
-| Cross-platform | Needs OS-specific process checks | `net` module handles it |
-| Future API ready | No extra benefit | ✅ Directly reusable |
-| PID reuse issue | ❌ Possible | ✅ Not applicable |
+| Aspect | Simple Port Bind | PID File Only | This Design (Dual-Layer) |
+|--------|-----------------|---------------|-------------------------|
+| Crash resilience | ✅ Good | ⚠️ Risk stale | ✅ Excellent |
+| Distinguish Cadence vs others | ❌ No | ❌ No | ✅ Yes |
+| Future API ready | ✅ Yes | ❌ No | ✅ Yes |
+| PID reuse issue | ✅ Not affected | ⚠️ Risk | ✅ Mitigated |
+| Complexity | Low | Medium | Medium-High |
 
-## 5. Edge Cases Handling
+## 5. Cross-Platform Implementation
+
+### Port Inspection
+
+| Platform | Method |
+|----------|--------|
+| **Linux** | `/proc/net/tcp` + `/proc/{pid}/cmdline` |
+| **macOS** | `lsof -i :{port}` + `ps -p {pid}` |
+| **Windows** | `netstat -ano` + `tasklist /FI "PID eq {pid}"` |
+
+### PID Alive Check
+
+| Platform | Method |
+|----------|--------|
+| **Unix** | `kill -0 {pid}` (signal 0 checks existence) |
+| **Windows** | `tasklist /FI "PID eq {pid}"` |
+
+## 6. Edge Cases Handling
 
 | Case | Handling |
 |------|----------|
-| Port occupied by another process | Treat as lock held, exit with clear error |
-| Port permission denied | Fallback: warn user but allow start (best effort) |
-| Multiple rapid starts | TCP binding is atomic at OS level |
-| Future API server migration | Lock release + API listen on same port |
+| Stale lock file after crash | Detect and delete automatically |
+| PID reuse (different process) | Verify with cmdline + port check |
+| Port used by non-Cadence | Show friendly message with process info |
+| Rapid concurrent starts | Atomic "wx" file open prevents race |
+| Read-only filesystem | Graceful fallback: warn but allow start |
+| Lock file deletion by user | TCP server still provides protection |
 
-## 6. Configuration (Optional Future)
+## 7. Configuration
 
 ```typescript
-// Could add config option later
 interface SingletonLockOptions {
-  port?: number;
-  host?: string;
-  disabled?: boolean; // Allow disabling for testing
+  port?: number;              // default: 9876
+  host?: string;              // default: '127.0.0.1'
+  timeoutMs?: number;         // default: 5000 (5s)
+  pollIntervalMs?: number;    // default: 100
+  staleMs?: number;           // default: 30000 (30s)
+  disabled?: boolean;         // for testing
 }
-```
-
-## 7. Error Messages
-
-```
-Error: Another Cadence scheduler is already running
-(Port 127.0.0.1:9876 is already in use)
 ```
 
 ## 8. Testing Strategy
 
 - Unit tests for SingletonLock class
+- Unit tests for port-inspector
 - Integration test: try starting two instances simultaneously
-- Test that lock is released after process exit (crash simulation)
+- Test stale lock cleanup
+- Test PID reuse scenario
+- Cross-platform testing (Linux, macOS, Windows if possible)
