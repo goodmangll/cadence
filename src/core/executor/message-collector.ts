@@ -5,7 +5,6 @@ import type {
   SDKToolProgressMessage,
   SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { ExecutionResult } from '../../models/execution';
 
 // 本地类型定义（SDK 使用的类型）
 interface TextBlock {

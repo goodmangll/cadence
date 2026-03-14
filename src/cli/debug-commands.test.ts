@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleRunTask } from '../cli/run-task';
+import { describe, it, expect, vi } from 'vitest';
 import { handleCron } from '../cli/cron-command';
 import { handleStatus } from '../cli/status-command';
 
