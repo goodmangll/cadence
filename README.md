@@ -277,45 +277,6 @@ sessionGroup: my-group  # 与 task1 共享 session
 
 > 注意：Session 共享依赖 Agent SDK 的自动压缩机制。
 
-## 完整示例
-
-### 示例：每天早上 9 点执行代码审查
-
-```bash
-# 1. 创建任务
-cadence task create \
-  --name "Morning Code Review" \
-  --cron "0 9 * * 1-5" \
-  --command "cd /path/to/project && git diff --stat"
-
-# 2. 启动调度器
-cadence run
-```
-
-调度器启动后，每天早上 9 点（周一到周五）会自动执行 `git diff --stat` 命令。
-
-### 示例：每 5 分钟健康检查
-
-```bash
-cadence task create \
-  --name "Health Check" \
-  --cron "*/5 * * * *" \
-  --command "curl -s http://localhost:3000/health"
-
-cadence run
-```
-
-### 示例：使用 Claude Agent SDK 执行任务
-
-```bash
-# 配置 API 密钥后，可以使用 Agent 模式
-cadence task create \
-  --name "AI Code Review" \
-  --cron "0 10 * * 1-5" \
-  --command "Review recent changes" \
-  --agent true
-```
-
 ## Cron 表达式
 
 格式：`分 时 日 月 周`
