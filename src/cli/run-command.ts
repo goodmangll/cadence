@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import * as child_process from 'child_process';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
@@ -10,12 +11,46 @@ import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { TaskLoader } from '../core/task-loader';
 import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
+import { getDaemonManager } from './daemon';
 
 interface RunOptions {
   local?: boolean;
+  daemon?: boolean;
 }
 
 export async function handleRun(options: RunOptions = {}): Promise<void> {
+  const { local = false, daemon = false } = options;
+
+  // Handle daemon mode
+  if (daemon) {
+    const manager = getDaemonManager(local);
+
+    // Check if already running
+    if (await manager.isRunning()) {
+      const pidFile = await manager.readPidFile();
+      console.error(`Daemon is already running (PID: ${pidFile?.pid})`);
+      process.exit(1);
+    }
+
+    // Fork to background
+    const args = process.argv.slice(2).filter((arg) => arg !== '-d' && arg !== '--daemon');
+
+    const child = child_process.spawn(process.execPath, ['dist/index.js', 'start', ...args], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: process.cwd(),
+      env: { ...process.env },
+    });
+
+    child.unref();
+
+    await manager.writePidFile(child.pid!);
+    console.log(`Daemon started (PID: ${child.pid})`);
+    process.exit(0);
+    return;
+  }
+
+  // Foreground mode - original logic
   const config = await loadConfig();
 
   // Determine base directory based on mode

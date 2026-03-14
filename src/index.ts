@@ -24,11 +24,32 @@ program
 // Start scheduler command
 program
   .command('start')
-  .description('Start the scheduler (foreground)')
+  .description('Start the scheduler (foreground or daemon)')
+  .option('-d, --daemon', 'Run in background as daemon')
   .option('--local', 'Use local .cadence/ directory instead of global ~/.cadence/')
   .action(async (options) => {
     const { handleRun } = await import('./cli/run-command');
     await handleRun(options);
+  });
+
+// Stop daemon command
+program
+  .command('stop')
+  .description('Stop the running daemon')
+  .option('--local', 'Use local .cadence/ directory')
+  .action(async (options) => {
+    const { handleStop } = await import('./cli/daemon');
+    await handleStop(options.local || false);
+  });
+
+// Restart daemon command
+program
+  .command('restart')
+  .description('Restart the daemon')
+  .option('--local', 'Use local .cadence/ directory')
+  .action(async (options) => {
+    const { handleRestart } = await import('./cli/daemon');
+    await handleRestart(options.local || false);
   });
 
 // Run task command (immediate execution)
@@ -136,12 +157,19 @@ program
     });
   });
 
-// Status command
+// Status command (task config or daemon)
 program
   .command('status')
-  .description('Show task configuration status')
-  .action(async () => {
-    await handleStatus();
+  .description('Show task configuration status or daemon status')
+  .option('--daemon', 'Show daemon status instead')
+  .action(async (options) => {
+    if (options.daemon) {
+      const { handleDaemonStatus } = await import('./cli/daemon');
+      await handleDaemonStatus();
+    } else {
+      const { handleStatus } = await import('./cli/status-command');
+      await handleStatus();
+    }
   });
 
 program.parse();
