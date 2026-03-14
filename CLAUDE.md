@@ -245,59 +245,22 @@ pnpm test --coverage
 ## Git Management
 
 ### Branch Strategy
-- **Main branch**: `main` (production-ready code)
+- **Main branch**: `main` (production-ready, stable code)
+- **Staging branch**: `staging` (development verification - merge here first, verify, then merge to main)
 - **Temporary branches**: `feature/*`, `fix/*`, `refactor/*`, `release/*`
 - **Worktree location**: `.worktrees/`
 
-### Commit Convention
-Uses [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Code style (formatting, no logic change)
-- `refactor`: Code refactoring
-- `perf`: Performance improvement
-- `test`: Adding/updating tests
-- `build`: Build system or dependencies
-- `ci`: CI/CD configuration
-- `chore`: Maintenance tasks
-- `revert`: Reverting previous commits
-
-**Examples:**
-```
-feat: add task scheduler support
-fix: resolve memory leak in executor
-docs: update API documentation
-refactor: simplify cron parser logic
-```
-
-### Tools
-
-- **husky**: Git hooks for commit validation
-- **commitlint**: Validates commit messages against Conventional Commits
-- **semantic-release**: Automated versioning and package publishing
-
 ### Workflow
+1. Create a feature branch from `staging`: `git checkout -b feature/xxx staging`
+2. Develop and test in the feature branch
+3. Merge to `staging` for verification
+4. After testing/verifying in staging, merge to `main`
 
-1. Create a worktree for new feature:
-   ```bash
-   git worktree add .worktrees/feature-name -b feature/feature-name
-   ```
-
-2. Make changes and commit:
-   ```bash
-   git add .
-   git commit -m "feat: add new feature"
-   ```
-
-3. After completing work, use `superpowers:finishing-a-development-branch` to merge or create PR.
+### Branch Structure
+```
+main     (stable - production ready)
+  ↑
+staging  (verify here first, then merge to main)
+  ↑
+feature/*, fix/* (development)
+```
