@@ -42,7 +42,7 @@ describe('Executor', () => {
       trigger: { type: 'cron', expression: '0 9 * * *' },
       execution: {
         command: 'sleep 100',
-        timeout: 1, // 1 second timeout
+        timeout: 5, // 5 second timeout - give CI enough time to start the process
       },
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -50,7 +50,7 @@ describe('Executor', () => {
 
     const result = await executor.execute(task);
     expect(result.status).toBe('timeout');
-  }, 30000);
+  }, 15000);
 
   it('should handle execution failure', async () => {
     const task: Task = {
