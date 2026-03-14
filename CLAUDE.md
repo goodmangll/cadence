@@ -216,14 +216,14 @@ The SessionManager exists at `src/core/session-manager/` but is not heavily inte
 
 ## Testing
 
-Tests are located in `tests/` directory and use Vitest.
+Tests are co-located with source files in `src/` directory and use Vitest.
 
 ```bash
 # Run all tests
 pnpm test
 
-# Run specific test
-pnpm test src/core/scheduler/index.test.ts
+# Run specific test (using vitest directly)
+pnpm exec vitest run src/core/scheduler/index.test.ts
 
 # Run with coverage
 pnpm test --coverage
