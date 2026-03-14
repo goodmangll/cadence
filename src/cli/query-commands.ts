@@ -1,31 +1,48 @@
-import { TaskStore, ExecutionFilter } from '../core/store/database';
+import { ExecutionStore, ExecutionFilter } from '../core/execution-store';
+import { TaskStore } from '../core/store/database';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
+import { Task } from '../models/task';
 import { Execution } from '../models/execution';
 
-function displayExecution(exec: Execution): void {
-  console.log(`  Task ID: ${exec.taskId}`);
-  console.log(`  Status: ${exec.status}`);
-  console.log(`  Started: ${exec.startedAt.toISOString()}`);
-  if (exec.durationMs) {
-    console.log(`  Duration: ${exec.durationMs}ms`);
+function getTimestampFromRecord(record: any): string {
+  const date = record.startedAt instanceof Date ? record.startedAt : new Date(record.startedAt);
+  return date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+}
+
+async function displayExecution(
+  store: ExecutionStore,
+  record: any,
+  verbose: boolean = false
+): Promise<void> {
+  const date = record.startedAt instanceof Date ? record.startedAt : new Date(record.startedAt);
+  console.log(`  Task: ${record.taskId} (${date.toLocaleString()})`);
+  console.log(`  Status: ${record.status}`);
+  console.log(`  Duration: ${record.durationMs}ms`);
+  if (record.cost !== undefined) {
+    console.log(`  Cost: $${record.cost.toFixed(3)}`);
   }
-  if (exec.stdout) {
-    console.log(`  Output: ${exec.stdout.substring(0, 100)}...`);
-  }
-  if (exec.stderr) {
-    console.log(`  Error: ${exec.stderr.substring(0, 100)}...`);
+
+  if (verbose && record.outputFile) {
+    const timestamp = getTimestampFromRecord(record);
+    const output = await store.getExecutionOutput(record.taskId, timestamp);
+    if (output) {
+      console.log(`  Output:`);
+      console.log(`  \u2500`.repeat(50));
+      console.log(output);
+      console.log(`  \u2500`.repeat(50));
+    }
+  } else if (!verbose) {
+    console.log(`  Output: [use --verbose to see full output]`);
   }
   console.log();
 }
 
 export async function handleLogs(options: any): Promise<void> {
-  const config = await loadConfig();
-  const store = new TaskStore(config.storage.dbPath);
+  const store = new ExecutionStore(process.cwd());
+  const verbose = options.verbose || options.v;
 
   try {
-    await store.init();
-
     let lastTimestamp: Date | null = null;
     let firstLoad = true;
     let running = true;
@@ -47,9 +64,8 @@ export async function handleLogs(options: any): Promise<void> {
         filter.taskId = options.taskId;
       }
 
-      if (options.sessionGroup) {
-        filter.sessionGroup = options.sessionGroup;
-      }
+      // Note: sessionGroup filtering would require loading tasks to map
+      // For now, we skip sessionGroup filter in this implementation
 
       // First load: get latest N entries
       // Subsequent loads: get only new entries after lastTimestamp
@@ -68,21 +84,24 @@ export async function handleLogs(options: any): Promise<void> {
         } else {
           console.log(`Found ${executions.length} execution(s):\n`);
           for (const exec of executions) {
-            displayExecution(exec);
+            await displayExecution(store, exec, verbose);
           }
         }
       } else {
         // For follow mode, display new entries in chronological order
         if (executions.length > 0) {
           for (const exec of [...executions].reverse()) {
-            displayExecution(exec);
+            await displayExecution(store, exec, verbose);
           }
         }
       }
 
       // Update last timestamp
       if (executions.length > 0) {
-        lastTimestamp = executions[0].startedAt;
+        const firstExec = executions[0];
+        lastTimestamp = firstExec.startedAt instanceof Date
+          ? firstExec.startedAt
+          : new Date(firstExec.startedAt);
       }
 
       if (!options.follow) {
@@ -99,8 +118,6 @@ export async function handleLogs(options: any): Promise<void> {
     if (options.follow) {
       process.off('SIGINT', sigintHandler);
     }
-
-    await store.close();
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error('Failed to load logs', { error: errorMsg });
