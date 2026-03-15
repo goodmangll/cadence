@@ -53,11 +53,10 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   const config = await loadConfig();
 
   // Determine base directory based on mode
-  // Production mode: ~/.cadence/ (pointing to .cadence directory itself)
-  // Development mode (--local): process.cwd()/.cadence/
-  const baseDir = options.local
-    ? path.join(process.cwd(), '.cadence')
-    : path.join(os.homedir(), '.cadence');
+  // FileStore will automatically append .cadence to the baseDir
+  // Local mode: process.cwd() -> {cwd}/.cadence/tasks
+  // Global mode: os.homedir() -> ~/.cadence/tasks
+  const baseDir = options.local ? process.cwd() : os.homedir();
 
   console.log(`Running in ${options.local ? 'local' : 'global'} mode`);
   console.log(`Base directory: ${baseDir}`);
