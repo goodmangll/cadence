@@ -1,6 +1,5 @@
 import { FileStore } from '../store/file-store';
 import { Task, TaskFilter, createTask, validateTask } from '../../models/task';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
 import * as fs from 'fs/promises';
 import * as path from 'path';
