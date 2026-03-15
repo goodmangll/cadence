@@ -67,17 +67,47 @@ class SingletonLock {
    - 移除 lock 文件相关代码
    - 移除 stale 检测逻辑（端口占用 = 正在运行）
    - 支持端口参数注入（用于测试）
+   - 保留 `isRunning()` 静态方法用于检测
 
 2. **修改 run-command.ts**
-   - 前台模式也使用 SingletonLock（现有已支持）
-   - daemon 模式：fork 后父进程退出，子进程获取锁
+   - **前台模式**：直接调用 `SingletonLock.acquire()` 获取锁
+   - **daemon 模式**：子进程启动后立即获取锁（子进程入口点获取）
+   - 端口冲突时显示友好错误信息
 
 3. **修改 daemon.ts**
-   - `isRunning()` 改为检查端口是否可用
+   - `isRunning()` 改为调用 `SingletonLock.isRunning()` 检查端口
    - 移除 PID 文件读写（不再需要）
+   - 移除 `writePidFile()` 方法
 
 4. **修改 status 命令**
-   - 直接尝试连接端口判断运行状态
+   - 调用 `SingletonLock.isRunning()` 检查端口
+   - 同时检测本地和全局模式的端口（不同端口）
+
+### 多模式端口分配
+
+| 模式 | 端口 |
+|------|------|
+| 本地模式 (--local) | 9876 |
+| 全局模式 | 9877 |
+
+这样 `pnpm dev --local` 和 `pnpm dev` 可以同时运行（不同工作目录）。
+
+### daemon 模式子进程获取锁
+
+当前 daemon 模式的问题：父进程 fork 子进程后，父进程退出，子进程没有获取锁。
+
+修复方案：在子进程入口点（`index.js start`）添加锁获取逻辑。
+
+```typescript
+// index.ts start 命令入口
+program.command('start')
+  .action(async (options) => {
+    // 获取锁
+    const lock = new SingletonLock({ port: getPortByMode(options.local) });
+    await lock.acquire();
+    // ... 启动 scheduler
+  });
+```
 
 ### 移除文件
 
