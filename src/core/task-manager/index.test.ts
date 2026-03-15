@@ -7,41 +7,52 @@ import fs from 'fs/promises';
 
 describe('Task Manager', () => {
   let manager: TaskManager;
-  let testDbPath: string;
+  let testDir: string;
+  let tasksDir: string;
 
   beforeEach(async () => {
-    testDbPath = path.join(os.tmpdir(), `test-task-manager-${uuidv4()}.db`);
-    manager = new TaskManager(testDbPath);
+    testDir = path.join(os.tmpdir(), `test-task-manager-${uuidv4()}`);
+    tasksDir = path.join(testDir, '.cadence', 'tasks');
+    await fs.mkdir(tasksDir, { recursive: true });
+    manager = new TaskManager(testDir);
     await manager.init();
   });
 
   afterEach(async () => {
     await manager.close();
-    // Clean up test database
+    // Clean up test directory
     try {
-      await fs.unlink(testDbPath);
+      await fs.rm(testDir, { recursive: true, force: true });
     } catch (error) {
       // Ignore errors
     }
   });
 
   it('should create a new task', async () => {
+    // Create a command file
+    const commandFilePath = path.join(tasksDir, 'test-task.md');
+    await fs.writeFile(commandFilePath, 'test command content');
+
     const task = await manager.createTask({
       name: 'Test Task',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test' },
+      cron: '0 9 * * *',
+      commandFile: 'test-task.md',
     });
 
     expect(task).toBeDefined();
-    expect(task.id).toBeDefined();
+    expect(task.id).toBe('test-task');
     expect(task.name).toBe('Test Task');
   });
 
   it('should retrieve a task by ID', async () => {
+    // Create a command file
+    const commandFilePath = path.join(tasksDir, 'test-task.md');
+    await fs.writeFile(commandFilePath, 'test command content');
+
     const created = await manager.createTask({
       name: 'Test Task',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test' },
+      cron: '0 9 * * *',
+      commandFile: 'test-task.md',
     });
 
     const retrieved = await manager.getTask(created.id);
@@ -50,15 +61,19 @@ describe('Task Manager', () => {
   });
 
   it('should list all tasks', async () => {
+    // Create command files
+    await fs.writeFile(path.join(tasksDir, 'task1.md'), 'test1');
+    await fs.writeFile(path.join(tasksDir, 'task2.md'), 'test2');
+
     await manager.createTask({
       name: 'Task 1',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test1' },
+      cron: '0 9 * * *',
+      commandFile: 'task1.md',
     });
     await manager.createTask({
       name: 'Task 2',
-      trigger: { type: 'cron', expression: '0 10 * * *' },
-      execution: { command: 'test2' },
+      cron: '0 10 * * *',
+      commandFile: 'task2.md',
     });
 
     const tasks = await manager.listTasks();
@@ -66,10 +81,14 @@ describe('Task Manager', () => {
   });
 
   it('should enable and disable tasks', async () => {
+    // Create a command file
+    const commandFilePath = path.join(tasksDir, 'test-task.md');
+    await fs.writeFile(commandFilePath, 'test command content');
+
     const task = await manager.createTask({
       name: 'Test Task',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test' },
+      cron: '0 9 * * *',
+      commandFile: 'test-task.md',
     });
 
     expect(task.enabled).toBe(true);
@@ -84,10 +103,14 @@ describe('Task Manager', () => {
   });
 
   it('should delete a task', async () => {
+    // Create a command file
+    const commandFilePath = path.join(tasksDir, 'test-task.md');
+    await fs.writeFile(commandFilePath, 'test command content');
+
     const task = await manager.createTask({
       name: 'Test Task',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test' },
+      cron: '0 9 * * *',
+      commandFile: 'test-task.md',
     });
 
     await manager.deleteTask(task.id);
@@ -96,19 +119,21 @@ describe('Task Manager', () => {
   });
 
   it('should update a task', async () => {
+    // Create a command file
+    const commandFilePath = path.join(tasksDir, 'test-task.md');
+    await fs.writeFile(commandFilePath, 'test command content');
+
     const task = await manager.createTask({
       name: 'Test Task',
-      trigger: { type: 'cron', expression: '0 9 * * *' },
-      execution: { command: 'test' },
+      cron: '0 9 * * *',
+      commandFile: 'test-task.md',
     });
 
     const updated = await manager.updateTask(task.id, {
       name: 'Updated Task',
-      execution: { command: 'updated' },
     });
 
     expect(updated.name).toBe('Updated Task');
-    expect(updated.execution.command).toBe('updated');
     expect(updated.id).toBe(task.id); // ID should not change
   });
 

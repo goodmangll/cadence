@@ -65,8 +65,10 @@ export function validateTask(task: Task): ValidationResult {
     errors.push('Task name is required');
   }
 
-  if (!task.execution.command || task.execution.command.trim() === '') {
-    errors.push('Command is required');
+  // Accept either command or commandFile
+  const hasCommand = task.execution.command?.trim() || task.execution.commandFile?.trim();
+  if (!hasCommand) {
+    errors.push('Command or commandFile is required');
   }
 
   if (task.trigger.type === 'cron' && task.trigger.expression) {
