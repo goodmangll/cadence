@@ -255,22 +255,22 @@ cat .cadence/executions/{task-id}/{timestamp}/output.md
 ## Git Management
 
 ### Branch Strategy
-- **Main branch**: `main` (production-ready, stable code)
-- **Staging branch**: `staging` (development verification - merge here first, verify, then merge to main)
+- **Main branch**: `main` (production-ready, stable code, read-only)
+- **Staging branch**: `staging` (development verification - PR target)
 - **Temporary branches**: `feature/*`, `fix/*`, `refactor/*`, `release/*`
 - **Worktree location**: `.worktrees/`
 
 ### Workflow
-1. Create a feature branch from `staging`: `git checkout -b feature/xxx staging`
+1. Create a feature branch from `staging`: `git checkout -b feature/xxx origin/staging`
 2. Develop and test in the feature branch
-3. Merge to `staging` for verification
-4. After testing/verifying in staging, merge to `main`
+3. Push and create PR to `staging`
+4. After CI passes and verified in staging, merge to `main` (via PR or direct merge if allowed)
 
 ### Branch Structure
 ```
-main     (stable - production ready)
+main     (stable - production ready, read-only)
   ↑
-staging  (verify here first, then merge to main)
+staging  (PR target, CI runs here)
   ↑
 feature/*, fix/* (development)
 ```
