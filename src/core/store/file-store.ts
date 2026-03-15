@@ -1,7 +1,24 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import { Task, TaskFilter } from '../../models/task';
 import { Execution, ExecutionStatus } from '../../models/execution';
+
+interface TaskConfig {
+  name: string;
+  description?: string;
+  cron: string;
+  commandFile?: string;
+  command?: string;
+  enabled?: boolean;
+  timezone?: string;
+  workingDir?: string;
+  settingSources?: string[];
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  mcpServers?: Record<string, { command: string; args?: string[] }>;
+  sessionGroup?: string;
+}
 
 export interface ExecutionFilter {
   taskId?: string;
@@ -25,7 +42,11 @@ export class FileStore {
   }
 
   async init(): Promise<void> {
-    // No-op for file store, directories are created as needed
+    // Migrate any existing JSON files to YAML
+    const migrated = await this.migrateJsonToYaml();
+    if (migrated > 0) {
+      console.log(`Migrated ${migrated} task(s) from JSON to YAML`);
+    }
   }
 
   async close(): Promise<void> {
@@ -36,27 +57,119 @@ export class FileStore {
     await fs.mkdir(this.tasksDir, { recursive: true });
   }
 
+  async migrateJsonToYaml(): Promise<number> {
+    try {
+      await fs.access(this.tasksDir);
+    } catch {
+      return 0;
+    }
+
+    const files = await fs.readdir(this.tasksDir);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+    let migrated = 0;
+    for (const file of jsonFiles) {
+      const jsonPath = path.join(this.tasksDir, file);
+      const yamlPath = jsonPath.replace('.json', '.yaml');
+
+      try {
+        const content = await fs.readFile(jsonPath, 'utf-8');
+        const task = JSON.parse(content);
+
+        // Convert to YAML format (without internal fields)
+        const yamlTask = {
+          name: task.name,
+          description: task.description,
+          cron: task.trigger?.expression,
+          commandFile: task.execution?.commandFile,
+          enabled: task.enabled,
+          timezone: task.trigger?.timezone,
+          workingDir: task.execution?.workingDir,
+          settingSources: task.execution?.settingSources,
+          allowedTools: task.execution?.allowedTools,
+          disallowedTools: task.execution?.disallowedTools,
+          mcpServers: task.execution?.mcpServers,
+          sessionGroup: task.execution?.sessionGroup,
+        };
+
+        await fs.writeFile(yamlPath, yaml.dump(yamlTask, { indent: 2, lineWidth: 0 }));
+        await fs.unlink(jsonPath);
+        migrated++;
+      } catch {
+        // Skip files that fail to migrate
+      }
+    }
+
+    return migrated;
+  }
+
   async saveTask(task: Task): Promise<void> {
     await this.ensureTasksDir();
-    const filePath = path.join(this.tasksDir, `${task.id}.json`);
-    await fs.writeFile(filePath, JSON.stringify(task, null, 2));
+    const filePath = path.join(this.tasksDir, `${task.id}.yaml`);
+
+    // Convert Task to YAML-friendly format (without internal fields)
+    const taskConfig = {
+      name: task.name,
+      description: task.description,
+      cron: task.trigger.expression,
+      commandFile: task.execution.commandFile,
+      enabled: task.enabled,
+      timezone: task.trigger.timezone,
+      workingDir: task.execution.workingDir,
+      settingSources: task.execution.settingSources,
+      allowedTools: task.execution.allowedTools,
+      disallowedTools: task.execution.disallowedTools,
+      mcpServers: task.execution.mcpServers,
+      sessionGroup: task.execution.sessionGroup,
+    };
+
+    const content = yaml.dump(taskConfig, {
+      indent: 2,
+      lineWidth: 0,
+      noRefs: true,
+      sortKeys: false
+    });
+    await fs.writeFile(filePath, content);
   }
 
   async getTask(id: string): Promise<Task | null> {
-    const filePath = path.join(this.tasksDir, `${id}.json`);
+    const filePath = path.join(this.tasksDir, `${id}.yaml`);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      const task = JSON.parse(content);
-      // Restore Date objects
-      task.createdAt = new Date(task.createdAt);
-      task.updatedAt = new Date(task.updatedAt);
-      if (task.nextRunAt) {
-        task.nextRunAt = new Date(task.nextRunAt);
-      }
-      return task;
+      const config = yaml.load(content) as TaskConfig;
+
+      // Convert YAML config to Task model
+      return this.configToTask(id, config);
     } catch {
       return null;
     }
+  }
+
+  private configToTask(id: string, config: TaskConfig): Task {
+    const now = new Date();
+    return {
+      id,
+      name: config.name,
+      description: config.description,
+      enabled: config.enabled ?? true,
+      trigger: {
+        type: 'cron',
+        expression: config.cron,
+        timezone: config.timezone,
+      },
+      execution: {
+        command: config.command || '',
+        commandFile: config.commandFile,
+        workingDir: config.workingDir,
+        settingSources: config.settingSources,
+        allowedTools: config.allowedTools,
+        disallowedTools: config.disallowedTools,
+        mcpServers: config.mcpServers,
+        sessionGroup: config.sessionGroup,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
   async loadTasks(filter?: TaskFilter): Promise<Task[]> {
@@ -70,16 +183,14 @@ export class FileStore {
     const tasks: Task[] = [];
 
     for (const file of files) {
-      if (!file.endsWith('.json')) continue;
+      if (!file.endsWith('.yaml') && !file.endsWith('.yml')) continue;
       try {
         const content = await fs.readFile(path.join(this.tasksDir, file), 'utf-8');
-        const task = JSON.parse(content) as Task;
-        // Restore Date objects
-        task.createdAt = new Date(task.createdAt);
-        task.updatedAt = new Date(task.updatedAt);
-        if (task.nextRunAt) {
-          task.nextRunAt = new Date(task.nextRunAt);
-        }
+        const config = yaml.load(content) as TaskConfig;
+        const taskId = file.replace(/\.ya?ml$/, '');
+
+        const task = this.configToTask(taskId, config);
+
         if (filter?.enabled !== undefined) {
           if (task.enabled !== filter.enabled) continue;
         }
@@ -93,7 +204,7 @@ export class FileStore {
   }
 
   async deleteTask(id: string): Promise<void> {
-    const filePath = path.join(this.tasksDir, `${id}.json`);
+    const filePath = path.join(this.tasksDir, `${id}.yaml`);
     try {
       await fs.unlink(filePath);
     } catch (e: unknown) {
