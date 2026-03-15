@@ -90,14 +90,22 @@ cadence/
 │   │   ├── index.ts            # CLI entry point
 │   │   ├── task-commands.ts    # Task CRUD commands
 │   │   ├── run-command.ts      # Scheduler startup
-│   │   └── query-commands.ts   # logs, stats commands
+│   │   ├── run-task.ts         # Run task immediately
+│   │   ├── cron-command.ts     # Cron expression parser
+│   │   ├── status-command.ts   # Status command
+│   │   ├── daemon.ts           # Daemon manager
+│   │   └── query-commands.ts  # logs, stats commands
 │   ├── core/                   # Core business logic
 │   │   ├── scheduler/          # node-cron scheduler
 │   │   ├── executor/           # Command executor
+│   │   │   ├── index.ts        # Basic executor (shell commands)
+│   │   │   ├── agent-sdk-executor.ts  # Agent SDK executor
+│   │   │   ├── strategies/     # Execution strategies
+│   │   │   └── ...
 │   │   ├── task-manager/       # Task CRUD operations
 │   │   ├── task-loader.ts      # Load tasks from YAML
 │   │   ├── execution-store.ts  # Execution history storage
-│   │   └── session-manager/    # Session state (minimal)
+│   │   └── session-manager/    # Session state management
 │   ├── models/                 # Data models
 │   │   ├── task.ts
 │   │   └── execution.ts
@@ -105,7 +113,9 @@ cadence/
 │   │   └── loader.ts
 │   └── utils/                 # Utilities
 │       ├── logger.ts
-│       └── singleton-lock.ts
+│       ├── singleton-lock.ts   # Singleton lock
+│       ├── pid-alive.ts       # PID alive check
+│       └── port-inspector.ts  # Port inspector
 ├── tests/                     # Test files
 ├── docs/                     # Documentation
 ├── package.json
@@ -131,6 +141,74 @@ Stores execution results in `.cadence/executions/{taskId}/{timestamp}/` director
 
 ### M5: File Store (`src/core/store/file-store.ts`)
 File-based YAML storage for tasks and execution history.
+
+### M6: Agent SDK Executor (`src/core/executor/agent-sdk-executor.ts`)
+Uses Claude Agent SDK to execute tasks. Exports `AgentSDKExecutor` class:
+
+```typescript
+class AgentSDKExecutor {
+  execute(task: Task): Promise<ExecutionResult>
+}
+```
+Supports single-turn (`singleTurnStrategy`) and multi-turn (`multiTurnStrategy`) execution modes.
+This is complementary to the basic `Executor` (shell commands).
+
+### M7: Session Manager (`src/core/session-manager/`)
+Manages shared session context across tasks. Core files:
+- `index.ts`: SessionManager main class
+- `SessionState.ts`: Session state data structure
+
+```typescript
+interface SessionState {
+  id: string
+  groupId: string
+  createdAt: Date
+  lastUsedAt: Date
+  messages: Message[]
+}
+
+class SessionManager {
+  getSession(groupId: string): SessionState
+  releaseSession(groupId: string): void
+}
+```
+
+### M8: Daemon Manager (`src/cli/daemon.ts`)
+Manages background scheduler process. Core functions:
+
+```typescript
+function getDaemonManager(local: boolean): DaemonManager
+
+class DaemonManager {
+  isRunning(): Promise<boolean>
+  writePidFile(pid: number): Promise<void>
+  readPidFile(): Promise<{ pid: number } | null>
+}
+```
+
+### M9: Singleton Lock (`src/utils/singleton-lock.ts`)
+Prevents multiple scheduler instances. Uses port locking mechanism.
+
+```typescript
+class SingletonLock {
+  acquire(): Promise<void>
+  release(): Promise<void>
+}
+```
+
+### M10: PID Alive Check (`src/utils/pid-alive.ts`)
+Checks if a process is alive.
+
+```typescript
+function isPidAlive(pid: number): Promise<boolean>
+```
+
+### M11: Port Inspector (`src/utils/port-inspector.ts`)
+Checks if a port is in use.
+
+```typescript
+function isPortInUse(port: number): Promise<boolean>
+```
 
 ---
 
@@ -252,9 +330,14 @@ cat .cadence/executions/{task-id}/{timestamp}/output.md
 
 - `src/index.ts` - CLI entry point
 - `src/cli/run-command.ts` - Main scheduler startup
+- `src/cli/run-task.ts` - Run task immediately
+- `src/cli/cron-command.ts` - Cron expression parser
+- `src/cli/daemon.ts` - Daemon manager
 - `src/core/scheduler/index.ts` - Core scheduling logic
-- `src/core/executor/index.ts` - Command execution
+- `src/core/executor/index.ts` - Basic command execution
+- `src/core/executor/agent-sdk-executor.ts` - Agent SDK execution
 - `src/core/execution-store.ts` - Execution result storage
+- `src/core/session-manager/` - Session management
 - `src/models/task.ts` - Task data model
 
 ---
