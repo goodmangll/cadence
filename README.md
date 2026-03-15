@@ -362,7 +362,6 @@ src/
 │   ├── scheduler/          # node-cron 调度器
 │   ├── executor/           # 命令执行器
 │   ├── task-manager/       # 任务管理
-│   ├── task-loader.ts      # YAML 任务加载
 │   ├── execution-store.ts  # 执行记录存储
 │   └── store/              # 文件存储
 ├── models/                 # 数据模型

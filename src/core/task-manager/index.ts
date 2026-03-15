@@ -1,7 +1,9 @@
 import { FileStore } from '../store/file-store';
 import { Task, TaskFilter, createTask, validateTask } from '../../models/task';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { validateCron } from '../scheduler/cron-parser';
 
 export class TaskManager {
   private store: FileStore;
@@ -26,26 +28,84 @@ export class TaskManager {
     this.initialized = false;
   }
 
-  async createTask(input: Partial<Task>): Promise<Task> {
+  async createTask(input: {
+    name: string;
+    description?: string;
+    cron: string;
+    commandFile: string;
+    enabled?: boolean;
+    timezone?: string;
+    workingDir?: string;
+  }): Promise<Task> {
     this.ensureInitialized();
 
-    const now = new Date();
-    const task = createTask({
-      ...input,
-      id: input.id || uuidv4(),
-      createdAt: input.createdAt || now,
-      updatedAt: now,
-    });
+    // Validate input
+    await this.validateTaskInput(input);
 
-    const validation = validateTask(task);
-    if (!validation.valid) {
-      throw new Error(`Invalid task: ${validation.errors.join(', ')}`);
-    }
+    // Load command file content
+    const tasksDir = path.join(this.store['baseDir'], '.cadence', 'tasks');
+    const commandPath = path.resolve(tasksDir, input.commandFile);
+    const command = await fs.readFile(commandPath, 'utf-8');
+
+    const task = createTask({
+      id: path.basename(input.commandFile, path.extname(input.commandFile)),
+      name: input.name,
+      description: input.description,
+      enabled: input.enabled ?? true,
+      trigger: {
+        type: 'cron',
+        expression: input.cron,
+        timezone: input.timezone,
+      },
+      execution: {
+        command,
+        commandFile: input.commandFile,
+        workingDir: input.workingDir || this.store['baseDir'],
+      },
+    });
 
     await this.store.saveTask(task);
     logger.info('Task created', { taskId: task.id, name: task.name });
 
     return task;
+  }
+
+  private async validateTaskInput(input: {
+    name?: string;
+    cron?: string;
+    commandFile?: string;
+  }): Promise<void> {
+    const errors: string[] = [];
+
+    if (!input.name || input.name.trim() === '') {
+      errors.push('Task name is required');
+    }
+
+    if (!input.cron || input.cron.trim() === '') {
+      errors.push('Cron expression is required');
+    } else {
+      // Validate cron using existing validateCron function
+      if (!validateCron(input.cron)) {
+        errors.push('Invalid cron expression');
+      }
+    }
+
+    if (!input.commandFile || input.commandFile.trim() === '') {
+      errors.push('Command file is required');
+    } else {
+      // Validate commandFile exists (relative to tasksDir)
+      const tasksDir = path.join(this.store['baseDir'], '.cadence', 'tasks');
+      const commandPath = path.resolve(tasksDir, input.commandFile);
+      try {
+        await fs.access(commandPath);
+      } catch {
+        errors.push(`Command file not found: ${input.commandFile}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(errors.join(', '));
+    }
   }
 
   async getTask(id: string): Promise<Task | null> {
