@@ -123,6 +123,15 @@ echo "Hello from scheduled task!"
 
 ## 命令分类
 
+### 错误处理
+
+| 场景 | 命令 | 错误信息 |
+|------|------|----------|
+| 无效 cron 表达式 | `cadence cron` | `Invalid cron expression: xxx` |
+| 任务不存在 | `cadence run <id>` | `Task not found: <id>` |
+| daemon 已运行 | `cadence start -d` | `Daemon is already running (PID: xxx)` |
+| daemon 未运行 | `cadence stop` | 无 PID 文件或进程不存在 |
+
 ### 任务管理命令
 
 ```bash
@@ -161,6 +170,9 @@ cadence start -d --local       # 后台
 # 停止 daemon
 cadence stop
 
+# 查看任务配置状态
+cadence status
+
 # 查看 daemon 状态
 cadence status --daemon
 
@@ -169,6 +181,38 @@ cadence restart
 ```
 
 启动后会一直运行，按任务配置的 Cron 时间执行。需要停止时按 `Ctrl+C` 或使用 `cadence stop`。
+
+### 执行命令
+
+```bash
+# 立即执行指定任务
+cadence run <task-id>
+
+# 执行临时命令（不存储）
+cadence run -c "echo hello"
+
+# 指定工作目录
+cadence run -c "npm test" -d /path/to/project
+
+# JSON 输出（便于脚本处理）
+cadence run <task-id> --json
+
+# 详细输出
+cadence run <task-id> --verbose
+```
+
+### Cron 表达式解析
+
+```bash
+# 查看下次执行时间
+cadence cron "*/5 * * * *"
+
+# 指定时区，显示3次
+cadence cron "*/5 * * * *" -t Asia/Shanghai -c 3
+
+# JSON 输出
+cadence cron "0 9 * * *" --json
+```
 
 ### 查询命令
 
