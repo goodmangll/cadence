@@ -126,21 +126,28 @@ Executes tasks as child processes using Node.js `spawn`. Currently uses basic co
 ### M3: Task Manager (`src/core/task-manager/`)
 CRUD operations for tasks using FileStore.
 
-### M4: Task Loader (`src/core/task-loader.ts`)
-Loads tasks from YAML files in `.cadence/tasks/` directory.
-
-### M5: Execution Store (`src/core/execution-store.ts`)
+### M4: Execution Store (`src/core/execution-store.ts`)
 Stores execution results in `.cadence/executions/{taskId}/{timestamp}/` directories.
 
-### M6: File Store (`src/core/store/file-store.ts`)
-File-based JSON storage for tasks and execution history.
+### M5: File Store (`src/core/store/file-store.ts`)
+File-based YAML storage for tasks and execution history.
 
 ---
 
 ## Data Storage
 
 ### Task Storage
-Tasks are stored as JSON files: `{project}/.cadence/tasks/{task-id}.json`
+Tasks are stored as YAML files: `{project}/.cadence/tasks/{task-id}.yaml`
+
+```yaml
+name: My Task
+description: Task description
+cron: "*/5 * * * *"
+commandFile: ../prompts/my-task.md
+enabled: true
+timezone: Asia/Shanghai
+workingDir: /path/to/project
+```
 
 ### Execution Storage
 Executions stored at: `{project}/.cadence/executions/{task-id}/{timestamp}/`
@@ -179,7 +186,7 @@ api:
 ```
 
 ### Task Configuration
-Tasks can be created via CLI (`cadence task create`) which stores them as JSON in `.cadence/tasks/`. Alternative YAML-based task loading is also supported via `TaskLoader`.
+Tasks can be created via CLI (`cadence task create`) which stores them as YAML in `.cadence/tasks/`. Tasks are validated to ensure the commandFile exists.
 
 ---
 
