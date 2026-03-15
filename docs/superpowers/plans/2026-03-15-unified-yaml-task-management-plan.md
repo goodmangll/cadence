@@ -216,6 +216,11 @@ async migrateJsonToYaml(): Promise<number> {
         enabled: task.enabled,
         timezone: task.trigger?.timezone,
         workingDir: task.execution?.workingDir,
+        settingSources: task.execution?.settingSources,
+        allowedTools: task.execution?.allowedTools,
+        disallowedTools: task.execution?.disallowedTools,
+        mcpServers: task.execution?.mcpServers,
+        sessionGroup: task.execution?.sessionGroup,
       };
 
       await fs.writeFile(yamlPath, yaml.dump(yamlTask, { indent: 2, lineWidth: 0 }));
@@ -282,6 +287,13 @@ Key changes needed:
 - Need to read commandFile content and populate `execution.command`
 - Validate that commandFile exists before creating task
 
+Add imports at top of task-manager/index.ts:
+```typescript
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { validateCron } from '../scheduler/cron-parser';
+```
+
 Add validation helper:
 ```typescript
 private async validateTaskInput(input: {
@@ -298,10 +310,9 @@ private async validateTaskInput(input: {
   if (!input.cron || input.cron.trim() === '') {
     errors.push('Cron expression is required');
   } else {
-    // Validate cron
-    const parts = input.cron.trim().split(/\s+/);
-    if (parts.length < 5 || parts.length > 6) {
-      errors.push('Invalid cron expression: must have 5 or 6 fields');
+    // Validate cron using existing validateCron function
+    if (!validateCron(input.cron)) {
+      errors.push('Invalid cron expression');
     }
   }
 
@@ -322,6 +333,12 @@ private async validateTaskInput(input: {
     throw new Error(errors.join(', '));
   }
 }
+```
+
+Also add the import at the top of the file:
+```typescript
+import { validateCron } from '../scheduler/cron-parser';
+```
 ```
 
 - [ ] **Step 3: Modify createTask to load commandFile content**
@@ -438,13 +455,13 @@ if (tasks.length > 0) {
 - [ ] **Step 3: Delete task-loader.ts**
 
 ```bash
-rm src/core/task-loader.ts
+mv src/core/task-loader.ts ~/.trash/
 ```
 
 - [ ] **Step 4: Remove task-loader test file**
 
 ```bash
-rm src/core/task-loader.test.ts
+mv src/core/task-loader.test.ts ~/.trash/
 ```
 
 - [ ] **Step 5: Run build**
