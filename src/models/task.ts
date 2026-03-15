@@ -14,6 +14,7 @@ export interface Trigger {
 
 export interface ExecutionConfig {
   command: string;
+  commandFile?: string;
   workingDir?: string;
   timeout?: number;
   settingSources?: SettingSource[];

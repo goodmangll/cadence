@@ -9,7 +9,6 @@ import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { TaskLoader } from '../core/task-loader';
 import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
 import { getDaemonManager } from './daemon';
 
@@ -91,28 +90,28 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   logger.info('Cadence scheduler starting...');
 
-  // Load tasks from .cadence/tasks/ directory
-  // baseDir already points to .cadence directory, so use it directly
-  const tasksDir = path.join(baseDir, 'tasks');
+  // Load all tasks from TaskManager
+  const tasks = await taskManager.listTasks();
 
-  try {
-    await fs.access(tasksDir);
-    // .cadence/tasks exists, load tasks
-    const loader = new TaskLoader(baseDir);
-    const tasks = await loader.loadTasks();
+  if (tasks.length > 0) {
+    console.log(`Loaded ${tasks.length} task(s)`);
 
-    if (tasks.length > 0) {
-      console.log(`Loaded ${tasks.length} task(s) from .cadence/tasks/`);
-
-      // Add loaded tasks to scheduler
-      for (const task of tasks) {
-        await scheduler.addTask(task);
-        logger.info('Scheduled task from file', { taskId: task.id, name: task.name });
+    // Add tasks to scheduler
+    for (const task of tasks) {
+      // Load commandFile content if not already loaded
+      if (!task.execution.command && task.execution.commandFile) {
+        const tasksDir = path.join(baseDir, 'tasks');
+        const commandPath = path.resolve(tasksDir, task.execution.commandFile);
+        try {
+          task.execution.command = await fs.readFile(commandPath, 'utf-8');
+        } catch {
+          logger.warn('Could not load commandFile', { taskId: task.id });
+          continue;
+        }
       }
+      await scheduler.addTask(task);
+      logger.info('Scheduled task', { taskId: task.id, name: task.name });
     }
-  } catch {
-    // No .cadence/tasks directory, skip
-    logger.info('No .cadence/tasks directory found, using database tasks only');
   }
 
   // Setup task trigger handler

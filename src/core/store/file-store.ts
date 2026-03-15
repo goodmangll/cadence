@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { Task, TaskFilter } from '../../models/task';
+import { Task, TaskFilter, SettingSource } from '../../models/task';
 import { Execution, ExecutionStatus } from '../../models/execution';
 
 interface TaskConfig {
@@ -161,7 +161,7 @@ export class FileStore {
         command: config.command || '',
         commandFile: config.commandFile,
         workingDir: config.workingDir,
-        settingSources: config.settingSources,
+        settingSources: (config.settingSources as SettingSource[] | undefined) || ['user', 'project', 'local'],
         allowedTools: config.allowedTools,
         disallowedTools: config.disallowedTools,
         mcpServers: config.mcpServers,
@@ -188,6 +188,23 @@ export class FileStore {
         const content = await fs.readFile(path.join(this.tasksDir, file), 'utf-8');
         const config = yaml.load(content) as TaskConfig;
         const taskId = file.replace(/\.ya?ml$/, '');
+
+        // Validate required fields
+        if (!config.name || !config.cron || !config.commandFile) {
+          console.warn(`Task ${taskId}: missing required fields, skipping`);
+          continue;
+        }
+
+        // Validate commandFile exists and load its content
+        if (config.commandFile) {
+          const commandPath = path.resolve(this.tasksDir, config.commandFile);
+          try {
+            config.command = await fs.readFile(commandPath, 'utf-8');
+          } catch {
+            console.warn(`Task ${taskId}: command file not found at ${config.commandFile}, skipping`);
+            continue;
+          }
+        }
 
         const task = this.configToTask(taskId, config);
 

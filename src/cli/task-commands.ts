@@ -1,5 +1,4 @@
 import { TaskManager } from '../core/task-manager';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { validateCron } from '../core/scheduler/cron-parser';
 
@@ -21,7 +20,7 @@ export async function handleTaskCreate(options: TaskCreateOptions): Promise<void
     process.exit(1);
   }
   if (!options.command) {
-    console.error('Error: --command is required');
+    console.error('Error: --command is required (this is the commandFile path)');
     process.exit(1);
   }
 
@@ -36,19 +35,12 @@ export async function handleTaskCreate(options: TaskCreateOptions): Promise<void
   try {
     await manager.init();
 
+    // command option is actually the commandFile path
     const task = await manager.createTask({
-      id: uuidv4(),
       name: options.name,
-      trigger: {
-        type: 'cron',
-        expression: options.cron,
-      },
-      execution: {
-        command: options.command,
-        workingDir: options.workingDir,
-        settingSources: ['user', 'project', 'local'],
-        sessionGroup: options.sessionGroup,
-      },
+      cron: options.cron,
+      commandFile: options.command,
+      workingDir: options.workingDir,
     });
 
     console.log('Task created successfully:');
