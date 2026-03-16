@@ -16,25 +16,26 @@
 ### 核心逻辑
 
 ```
-┌─────────────────────────────┐
-│  cadence start (前台/daemon) │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  SingletonLock.acquire()    │
-│  绑定端口 9876              │
-│  - 成功 → 继续运行          │
-│  - 失败 → 报错退出          │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  cadence status             │
-│  - 连接端口 9876            │
-│  - 成功 → 运行中            │
-│  - 失败 → 未运行            │
-└─────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  启动方式判断                               │
+│  - package.json 脚本运行 → 开发模式 → 9876  │
+│  - 直接运行 cadence → 生产模式 → 9877      │
+└─────────────────────┬───────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│  SingletonLock.acquire()                   │
+│  绑定对应端口                               │
+│  - 成功 → 继续运行                          │
+│  - 失败 → 报错退出                          │
+└─────────────────────┬───────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│  cadence status                             │
+│  - 检查端口 9876（开发模式）                │
+│  - 检查端口 9877（生产模式）                │
+└─────────────────────────────────────────────┘
 ```
 
 ### API 设计
@@ -85,29 +86,22 @@ class SingletonLock {
 
 ### 多模式端口分配
 
-| 模式 | 端口 |
-|------|------|
-| 本地模式 (--local) | 9876 |
-| 全局模式 | 9877 |
+| 启动方式 | 命令示例 | 端口 |
+|----------|----------|------|
+| 开发启动（pnpm） | `pnpm dev`、`pnpm start` | 9876 |
+| 生产启动（cadence） | `cadence start`、`cadence start -d` | 9877 |
 
-这样 `pnpm dev --local` 和 `pnpm dev` 可以同时运行（不同工作目录）。
+这样开发时运行 `pnpm start` 和用户安装后运行 `cadence start` 互不干扰。
 
-### daemon 模式子进程获取锁
-
-当前 daemon 模式的问题：父进程 fork 子进程后，父进程退出，子进程没有获取锁。
-
-修复方案：在子进程入口点（`index.js start`）添加锁获取逻辑。
+### 端口选择逻辑
 
 ```typescript
-// index.ts start 命令入口
-program.command('start')
-  .action(async (options) => {
-    // 获取锁
-    const lock = new SingletonLock({ port: getPortByMode(options.local) });
-    await lock.acquire();
-    // ... 启动 scheduler
-  });
+function getPort(isDev: boolean): number {
+  return isDev ? 9876 : 9877;
+}
 ```
+
+可通过环境变量 `CADENCE_DEV_PORT` 和 `CADENCE_PROD_PORT` 自定义。
 
 ### 移除文件
 
@@ -122,6 +116,7 @@ program.command('start')
 ## 验收标准
 
 1. `pnpm start` 和 `pnpm dev` 互斥（只能运行一个）
-2. `cadence status` 能检测到两种模式的运行状态
+2. `cadence status` 能检测到两种启动方式的运行状态
 3. `pnpm start` 后 `pnpm dev` 会报错退出
 4. `pnpm dev` 后 `pnpm start` 会报错退出
+5. `cadence start` 和 `pnpm start` 互不干扰（不同端口）
