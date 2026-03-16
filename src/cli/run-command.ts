@@ -26,8 +26,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
     // Check if already running
     if (await manager.isRunning()) {
-      const pidFile = await manager.readPidFile();
-      console.error(`Daemon is already running (PID: ${pidFile?.pid})`);
+      console.error(`Daemon is already running (port ${getLockPort()})`);
       process.exit(1);
     }
 
@@ -43,7 +42,6 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
     child.unref();
 
-    await manager.writePidFile(child.pid!);
     console.log(`Daemon started (PID: ${child.pid})`);
     process.exit(0);
     return;
