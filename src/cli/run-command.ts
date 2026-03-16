@@ -63,15 +63,11 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   // Acquire singleton lock FIRST
   const lock = new SingletonLock({ port: 9876 });
-  let lockHandle: Awaited<ReturnType<typeof lock.acquire>> | undefined;
   try {
-    lockHandle = await lock.acquire();
+    await lock.acquire();
   } catch (err) {
     if (err instanceof SingletonLockError) {
       console.error('Error:', err.message);
-      if (err.cause) {
-        console.error('Cause:', err.cause);
-      }
       process.exit(1);
     }
     throw err;
@@ -164,7 +160,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   // Handle shutdown signals
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();
@@ -173,7 +169,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();
