@@ -3,6 +3,25 @@ import * as net from 'net';
 const DEFAULT_PORT = 9876;
 const DEFAULT_HOST = '127.0.0.1';
 
+// 端口分配常量
+export const DEV_PORT = 9876;
+export const PROD_PORT = 9877;
+
+/**
+ * 判断是否为开发模式启动
+ * 开发模式: 通过 package.json 脚本启动 (pnpm dev / pnpm start)
+ * 生产模式: 直接运行 cadence 命令
+ */
+export function isDevMode(): boolean {
+  const args = process.argv;
+  // 如果命令行第一个参数是 dist/index.js 或 src/index.ts，说明是本地开发启动
+  return args[1]?.includes('dist/index.js') || args[1]?.includes('src/index.ts');
+}
+
+export function getLockPort(): number {
+  return isDevMode() ? DEV_PORT : PROD_PORT;
+}
+
 export interface SingletonLockOptions {
   port?: number;
   host?: string;

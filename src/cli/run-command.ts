@@ -9,7 +9,7 @@ import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
+import { SingletonLock, SingletonLockError, getLockPort } from '../utils/singleton-lock';
 import { getDaemonManager } from './daemon';
 
 interface RunOptions {
@@ -62,7 +62,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   console.log(`Base directory: ${baseDir}`);
 
   // Acquire singleton lock FIRST
-  const lock = new SingletonLock({ port: 9876 });
+  const lock = new SingletonLock({ port: getLockPort() });
   try {
     await lock.acquire();
   } catch (err) {
