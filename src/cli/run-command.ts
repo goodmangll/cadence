@@ -9,7 +9,7 @@ import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
+import { SingletonLock, SingletonLockError, getLockPort } from '../utils/singleton-lock';
 import { getDaemonManager } from './daemon';
 
 interface RunOptions {
@@ -26,8 +26,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
     // Check if already running
     if (await manager.isRunning()) {
-      const pidFile = await manager.readPidFile();
-      console.error(`Daemon is already running (PID: ${pidFile?.pid})`);
+      console.error(`Daemon is already running (port ${getLockPort()})`);
       process.exit(1);
     }
 
@@ -43,7 +42,6 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
     child.unref();
 
-    await manager.writePidFile(child.pid!);
     console.log(`Daemon started (PID: ${child.pid})`);
     process.exit(0);
     return;
@@ -62,16 +60,12 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   console.log(`Base directory: ${baseDir}`);
 
   // Acquire singleton lock FIRST
-  const lock = new SingletonLock({ port: 9876 });
-  let lockHandle: Awaited<ReturnType<typeof lock.acquire>> | undefined;
+  const lock = new SingletonLock({ port: getLockPort() });
   try {
-    lockHandle = await lock.acquire();
+    await lock.acquire();
   } catch (err) {
     if (err instanceof SingletonLockError) {
       console.error('Error:', err.message);
-      if (err.cause) {
-        console.error('Cause:', err.cause);
-      }
       process.exit(1);
     }
     throw err;
@@ -164,7 +158,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   // Handle shutdown signals
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();
@@ -173,7 +167,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();

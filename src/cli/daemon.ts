@@ -1,125 +1,51 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
-import { isPidAlive } from '../utils/pid-alive';
-
-export interface DaemonPidFile {
-  pid: number;
-  startedAt: string;
-  baseDir: string;
-}
+import { SingletonLock, DEV_PORT, PROD_PORT } from '../utils/singleton-lock';
 
 export class DaemonManager {
-  private baseDir: string;
+  private port: number;
 
-  constructor(baseDir: string) {
-    this.baseDir = baseDir;
-  }
-
-  private getPidFilePath(): string {
-    return path.join(this.baseDir, 'daemon.pid');
-  }
-
-  async writePidFile(pid: number): Promise<void> {
-    const pidFile: DaemonPidFile = {
-      pid,
-      startedAt: new Date().toISOString(),
-      baseDir: this.baseDir,
-    };
-    await fs.mkdir(this.baseDir, { recursive: true });
-    await fs.writeFile(this.getPidFilePath(), JSON.stringify(pidFile, null, 2));
-  }
-
-  async readPidFile(): Promise<DaemonPidFile | null> {
-    try {
-      const content = await fs.readFile(this.getPidFilePath(), 'utf-8');
-      return JSON.parse(content);
-    } catch {
-      return null;
-    }
-  }
-
-  async removePidFile(): Promise<void> {
-    try {
-      await fs.rm(this.getPidFilePath(), { force: true });
-    } catch {
-      // Ignore
-    }
+  constructor(port: number) {
+    this.port = port;
   }
 
   async isRunning(): Promise<boolean> {
-    const pidFile = await this.readPidFile();
-    if (!pidFile) return false;
-    return isPidAlive(pidFile.pid);
+    return SingletonLock.isRunning(this.port);
   }
 
   async getRunningPid(): Promise<number | null> {
-    const pidFile = await this.readPidFile();
-    if (!pidFile) return null;
-    if (!isPidAlive(pidFile.pid)) return null;
-    return pidFile.pid;
+    // 端口检测无法获取 PID，返回 null
+    return null;
   }
 }
 
 export function getDaemonManager(local: boolean = false): DaemonManager {
-  const baseDir = local
-    ? path.join(process.cwd(), '.cadence')
-    : path.join(os.homedir(), '.cadence');
-  return new DaemonManager(baseDir);
+  // local 参数现在决定检查哪个端口
+  // local=true -> DEV_PORT (9876), local=false -> PROD_PORT (9877)
+  const port = local ? DEV_PORT : PROD_PORT;
+  return new DaemonManager(port);
 }
 
 export async function handleStop(local: boolean = false): Promise<void> {
   const manager = getDaemonManager(local);
-  const pidFile = await manager.readPidFile();
+  const running = await manager.isRunning();
 
-  if (!pidFile) {
+  if (!running) {
     console.log('Daemon is not running');
     return;
   }
 
-  const pid = pidFile.pid;
-
-  if (!isPidAlive(pid)) {
-    console.log('Daemon is not running (stale PID file)');
-    await manager.removePidFile();
-    return;
-  }
-
-  console.log(`Stopping daemon (PID: ${pid})...`);
-
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch (err) {
-    console.error('Failed to send SIGTERM:', err);
-    process.exit(1);
-  }
-
-  // Wait for process to exit
-  const maxWait = 10000; // 10 seconds
-  const startTime = Date.now();
-  while (isPidAlive(pid) && Date.now() - startTime < maxWait) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  if (isPidAlive(pid)) {
-    console.log('Force killing daemon...');
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // Process already dead
-    }
-  }
-
-  await manager.removePidFile();
-  console.log('Daemon stopped');
+  // 由于使用端口检测，无法直接发送信号给进程
+  // 用户需要手动停止进程或使用其他方式
+  console.log('Daemon is running but cannot be stopped remotely via port detection.');
+  console.log('Please stop the process manually or use: kill $(lsof -t -i:PORT)');
+  console.log(`Port: ${local ? DEV_PORT : PROD_PORT}`);
 }
 
 export async function handleRestart(local: boolean = false): Promise<void> {
   const manager = getDaemonManager(local);
-  const wasRunning = await manager.isRunning();
+  const running = await manager.isRunning();
 
-  if (wasRunning) {
-    console.log('Stopping daemon...');
+  if (running) {
+    console.log('Daemon is running, stopping first...');
     await handleStop(local);
   }
 
@@ -142,27 +68,19 @@ export async function handleRestart(local: boolean = false): Promise<void> {
 }
 
 export async function handleDaemonStatus(): Promise<void> {
-  // Check both local and global
-  const localManager = getDaemonManager(true);
-  const globalManager = getDaemonManager(false);
+  const devRunning = await SingletonLock.isRunning(DEV_PORT);
+  const prodRunning = await SingletonLock.isRunning(PROD_PORT);
 
-  const localRunning = await localManager.isRunning();
-  const globalRunning = await globalManager.isRunning();
-
-  if (!localRunning && !globalRunning) {
-    console.log('Daemon is not running');
+  if (!devRunning && !prodRunning) {
+    console.log('Cadence is not running');
     return;
   }
 
-  if (localRunning) {
-    const pidFile = await localManager.readPidFile();
-    console.log(`Daemon is running (local mode, PID: ${pidFile?.pid})`);
-    console.log(`Started at: ${pidFile?.startedAt}`);
+  if (devRunning) {
+    console.log('Cadence is running (development mode, port 9876)');
   }
 
-  if (globalRunning && !localRunning) {
-    const pidFile = await globalManager.readPidFile();
-    console.log(`Daemon is running (global mode, PID: ${pidFile?.pid})`);
-    console.log(`Started at: ${pidFile?.startedAt}`);
+  if (prodRunning) {
+    console.log('Cadence is running (production mode, port 9877)');
   }
 }
