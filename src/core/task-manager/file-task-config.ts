@@ -35,15 +35,6 @@ interface RawTaskConfig {
     mcpServers?: unknown;
     outputFormat?: string;
     sessionGroup?: string;
-    rolloverStrategy?: {
-      maxExecutions?: number;
-      maxHours?: number;
-    };
-    progressConfig?: {
-      enabled?: boolean;
-      maxLength?: number;
-      outputPath?: string;
-    };
   };
   postActions?: unknown[];
 }
@@ -67,15 +58,6 @@ export interface FileExecutionConfig {
   }>;
   outputFormat?: string;
   sessionGroup?: string;
-  rolloverStrategy?: {
-    maxExecutions?: number;
-    maxHours?: number;
-  };
-  progressConfig?: {
-    enabled?: boolean;
-    maxLength?: number;
-    outputPath?: string;
-  };
 }
 
 export class FileTaskConfigLoader {
@@ -126,23 +108,6 @@ export class FileTaskConfigLoader {
    * 转换为内部配置格式
    */
   private convertToTaskConfig(taskConfig: RawTaskConfig): FileTaskConfig {
-    // 解析 rolloverStrategy
-    const rolloverStrategy = taskConfig.execution.rolloverStrategy
-      ? {
-          maxExecutions: taskConfig.execution.rolloverStrategy.maxExecutions || 10,
-          maxHours: taskConfig.execution.rolloverStrategy?.maxHours || 168,
-        }
-      : undefined;
-
-    // 解析 progressConfig
-    const progressConfig = taskConfig.execution.progressConfig
-      ? {
-          enabled: taskConfig.execution.progressConfig.enabled !== false,
-          maxLength: taskConfig.execution.progressConfig.maxLength || 2000,
-          outputPath: taskConfig.execution.progressConfig.outputPath,
-        }
-      : undefined;
-
     return {
       id: taskConfig.id || this.generateId(taskConfig.name),
       name: taskConfig.name,
@@ -159,8 +124,6 @@ export class FileTaskConfigLoader {
         mcpServers: taskConfig.execution.mcpServers as Record<string, { command: string; args?: string[] }> | undefined,
         outputFormat: taskConfig.execution.outputFormat,
         sessionGroup: taskConfig.execution.sessionGroup,
-        rolloverStrategy,
-        progressConfig,
       },
       postActions: taskConfig.postActions || [],
     };

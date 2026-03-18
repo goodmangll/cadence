@@ -1,5 +1,4 @@
 import { TaskManager } from '../core/task-manager';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { validateCron } from '../core/scheduler/cron-parser';
 
@@ -21,7 +20,7 @@ export async function handleTaskCreate(options: TaskCreateOptions): Promise<void
     process.exit(1);
   }
   if (!options.command) {
-    console.error('Error: --command is required');
+    console.error('Error: --command is required (this is the commandFile path)');
     process.exit(1);
   }
 
@@ -36,19 +35,12 @@ export async function handleTaskCreate(options: TaskCreateOptions): Promise<void
   try {
     await manager.init();
 
+    // command option is actually the commandFile path
     const task = await manager.createTask({
-      id: uuidv4(),
       name: options.name,
-      trigger: {
-        type: 'cron',
-        expression: options.cron,
-      },
-      execution: {
-        command: options.command,
-        workingDir: options.workingDir,
-        settingSources: ['user', 'project', 'local'],
-        sessionGroup: options.sessionGroup,
-      },
+      cron: options.cron,
+      commandFile: options.command,
+      workingDir: options.workingDir,
     });
 
     console.log('Task created successfully:');
@@ -75,11 +67,13 @@ export async function handleTaskList(): Promise<void> {
     if (tasks.length === 0) {
       console.log('No tasks found.');
     } else {
-      console.log(`Found ${tasks.length} task(s):\n`);
+      console.log(`\nTasks (${tasks.length}):\n`);
       for (const task of tasks) {
-        console.log(`  ${task.id} - ${task.name}`);
-        console.log(`    Status: ${task.enabled ? 'Enabled' : 'Disabled'}`);
-        console.log(`    Trigger: ${task.trigger.expression}`);
+        console.log(`  ${task.id}`);
+        console.log(`    name: ${task.name}`);
+        console.log(`    cron: ${task.trigger.expression}`);
+        console.log(`    commandFile: ${task.execution.commandFile || '-'}`);
+        console.log(`    enabled: ${task.enabled}`);
         console.log();
       }
     }
@@ -105,16 +99,21 @@ export async function handleTaskGet(id: string): Promise<void> {
       process.exit(1);
     }
 
-    console.log('Task details:');
-    console.log(`  ID: ${task.id}`);
-    console.log(`  Name: ${task.name}`);
-    console.log(`  Description: ${task.description || 'N/A'}`);
-    console.log(`  Status: ${task.enabled ? 'Enabled' : 'Disabled'}`);
-    console.log(`  Trigger: ${task.trigger.expression}`);
-    console.log(`  Command: ${task.execution.command}`);
-    console.log(`  Working Directory: ${task.execution.workingDir || 'N/A'}`);
-    console.log(`  Created: ${task.createdAt.toISOString()}`);
-    console.log(`  Updated: ${task.updatedAt.toISOString()}`);
+    // Show in YAML format
+    console.log(`id: ${task.id}`);
+    console.log(`name: ${task.name}`);
+    if (task.description) {
+      console.log(`description: ${task.description}`);
+    }
+    console.log(`cron: ${task.trigger.expression}`);
+    if (task.trigger.timezone) {
+      console.log(`timezone: ${task.trigger.timezone}`);
+    }
+    console.log(`commandFile: ${task.execution.commandFile || '-'}`);
+    if (task.execution.workingDir) {
+      console.log(`workingDir: ${task.execution.workingDir}`);
+    }
+    console.log(`enabled: ${task.enabled}`);
 
     await manager.close();
   } catch (error: unknown) {

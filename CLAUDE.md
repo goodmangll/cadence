@@ -49,50 +49,35 @@ pnpm run lint
 pnpm run format
 ```
 
-### Running
+### Running (Development)
 
 ```bash
-# Run scheduler in foreground
-pnpm run dev
-# or
-cadence run
+# Build project
+pnpm run build
 
-# Note: No API server or daemon commands implemented yet
+# Run scheduler in foreground (development)
+pnpm dev
+
+# Run scheduler as daemon
+pnpm start
+
+# Stop daemon
+pnpm run stop
+
+# Check daemon status
+pnpm run status
+
+# Restart daemon
+pnpm run restart
+
+# View logs
+pnpm run logs
+
+# Run tests
+pnpm test
 ```
 
-### Task Management
-
-```bash
-# Create task
-cadence task create --name "Daily Review" --cron "0 9 * * 1-5" --command "echo hello"
-
-# List tasks
-cadence task list
-
-# Get task details
-cadence task get <task-id>
-
-# Delete task
-cadence task delete <task-id>
-
-# Enable task
-cadence task enable <task-id>
-
-# Disable task
-cadence task disable <task-id>
-```
-
-### Query Commands
-
-```bash
-# View execution logs
-cadence logs
-cadence logs --task-id <task-id> --limit 10
-cadence logs -f  # Follow mode
-
-# View statistics
-cadence stats
-```
+**Note**: Task Management commands (e.g., `cadence task create`) are for production use only, not documented here.
 
 ---
 
@@ -105,14 +90,22 @@ cadence/
 │   │   ├── index.ts            # CLI entry point
 │   │   ├── task-commands.ts    # Task CRUD commands
 │   │   ├── run-command.ts      # Scheduler startup
-│   │   └── query-commands.ts   # logs, stats commands
+│   │   ├── run-task.ts         # Run task immediately
+│   │   ├── cron-command.ts     # Cron expression parser
+│   │   ├── status-command.ts   # Status command
+│   │   ├── daemon.ts           # Daemon manager
+│   │   └── query-commands.ts  # logs, stats commands
 │   ├── core/                   # Core business logic
 │   │   ├── scheduler/          # node-cron scheduler
 │   │   ├── executor/           # Command executor
+│   │   │   ├── index.ts        # Basic executor (shell commands)
+│   │   │   ├── agent-sdk-executor.ts  # Agent SDK executor
+│   │   │   ├── strategies/     # Execution strategies
+│   │   │   └── ...
 │   │   ├── task-manager/       # Task CRUD operations
 │   │   ├── task-loader.ts      # Load tasks from YAML
 │   │   ├── execution-store.ts  # Execution history storage
-│   │   └── session-manager/    # Session state (minimal)
+│   │   └── session-manager/    # Session state management
 │   ├── models/                 # Data models
 │   │   ├── task.ts
 │   │   └── execution.ts
@@ -120,7 +113,9 @@ cadence/
 │   │   └── loader.ts
 │   └── utils/                 # Utilities
 │       ├── logger.ts
-│       └── singleton-lock.ts
+│       ├── singleton-lock.ts   # Singleton lock
+│       ├── pid-alive.ts       # PID alive check
+│       └── port-inspector.ts  # Port inspector
 ├── tests/                     # Test files
 ├── docs/                     # Documentation
 ├── package.json
@@ -141,21 +136,96 @@ Executes tasks as child processes using Node.js `spawn`. Currently uses basic co
 ### M3: Task Manager (`src/core/task-manager/`)
 CRUD operations for tasks using FileStore.
 
-### M4: Task Loader (`src/core/task-loader.ts`)
-Loads tasks from YAML files in `.cadence/tasks/` directory.
-
-### M5: Execution Store (`src/core/execution-store.ts`)
+### M4: Execution Store (`src/core/execution-store.ts`)
 Stores execution results in `.cadence/executions/{taskId}/{timestamp}/` directories.
 
-### M6: File Store (`src/core/store/file-store.ts`)
-File-based JSON storage for tasks and execution history.
+### M5: File Store (`src/core/store/file-store.ts`)
+File-based YAML storage for tasks and execution history.
+
+### M6: Agent SDK Executor (`src/core/executor/agent-sdk-executor.ts`)
+Uses Claude Agent SDK to execute tasks. Exports `AgentSDKExecutor` class:
+
+```typescript
+class AgentSDKExecutor {
+  execute(task: Task): Promise<ExecutionResult>
+}
+```
+Supports single-turn (`singleTurnStrategy`) and multi-turn (`multiTurnStrategy`) execution modes.
+This is complementary to the basic `Executor` (shell commands).
+
+### M7: Session Manager (`src/core/session-manager/`)
+Manages shared session context across tasks. Core files:
+- `index.ts`: SessionManager main class
+- `SessionState.ts`: Session state data structure
+
+```typescript
+interface SessionState {
+  id: string
+  groupId: string
+  createdAt: Date
+  lastUsedAt: Date
+  messages: Message[]
+}
+
+class SessionManager {
+  getSession(groupId: string): SessionState
+  releaseSession(groupId: string): void
+}
+```
+
+### M8: Daemon Manager (`src/cli/daemon.ts`)
+Manages background scheduler process. Core functions:
+
+```typescript
+function getDaemonManager(local: boolean): DaemonManager
+
+class DaemonManager {
+  isRunning(): Promise<boolean>
+  writePidFile(pid: number): Promise<void>
+  readPidFile(): Promise<{ pid: number } | null>
+}
+```
+
+### M9: Singleton Lock (`src/utils/singleton-lock.ts`)
+Prevents multiple scheduler instances. Uses port locking mechanism.
+
+```typescript
+class SingletonLock {
+  acquire(): Promise<void>
+  release(): Promise<void>
+}
+```
+
+### M10: PID Alive Check (`src/utils/pid-alive.ts`)
+Checks if a process is alive.
+
+```typescript
+function isPidAlive(pid: number): Promise<boolean>
+```
+
+### M11: Port Inspector (`src/utils/port-inspector.ts`)
+Checks if a port is in use.
+
+```typescript
+function isPortInUse(port: number): Promise<boolean>
+```
 
 ---
 
 ## Data Storage
 
 ### Task Storage
-Tasks are stored as JSON files: `{project}/.cadence/tasks/{task-id}.json`
+Tasks are stored as YAML files: `{project}/.cadence/tasks/{task-id}.yaml`
+
+```yaml
+name: My Task
+description: Task description
+cron: "*/5 * * * *"
+commandFile: ../prompts/my-task.md
+enabled: true
+timezone: Asia/Shanghai
+workingDir: /path/to/project
+```
 
 ### Execution Storage
 Executions stored at: `{project}/.cadence/executions/{task-id}/{timestamp}/`
@@ -194,7 +264,7 @@ api:
 ```
 
 ### Task Configuration
-Tasks can be created via CLI (`cadence task create`) which stores them as JSON in `.cadence/tasks/`. Alternative YAML-based task loading is also supported via `TaskLoader`.
+Tasks can be created via CLI (`cadence task create`) which stores them as YAML in `.cadence/tasks/`. Tasks are validated to ensure the commandFile exists.
 
 ---
 
@@ -216,17 +286,42 @@ The SessionManager exists at `src/core/session-manager/` but is not heavily inte
 
 ## Testing
 
-Tests are located in `tests/` directory and use Vitest.
+### Unit Tests
+
+Run unit tests with Vitest:
 
 ```bash
-# Run all tests
 pnpm test
-
-# Run specific test
 pnpm test src/core/scheduler/index.test.ts
-
-# Run with coverage
 pnpm test --coverage
+```
+
+### Development Testing (Real Execution)
+
+For realistic testing, use `dev.sh` to run the scheduler and verify task execution:
+
+```bash
+# 1. Start scheduler (builds + runs in background)
+./dev.sh start
+
+# 2. Create a test task by writing JSON to .cadence/tasks/
+# Format: {project}/.cadence/tasks/{task-id}.json
+# See src/models/task.ts for the Task schema
+
+# 3. Wait for task to trigger based on cron expression
+
+# 4. Check execution results directly:
+cat .cadence/executions/{task-id}/{timestamp}/result.json
+cat .cadence/executions/{task-id}/{timestamp}/output.md
+
+# 5. View logs
+./dev.sh logs
+./dev.sh error-logs
+```
+
+**Quick verification**:
+```bash
+./dev.sh verify   # Runs: type-check + lint + build + test
 ```
 
 ---
@@ -235,9 +330,14 @@ pnpm test --coverage
 
 - `src/index.ts` - CLI entry point
 - `src/cli/run-command.ts` - Main scheduler startup
+- `src/cli/run-task.ts` - Run task immediately
+- `src/cli/cron-command.ts` - Cron expression parser
+- `src/cli/daemon.ts` - Daemon manager
 - `src/core/scheduler/index.ts` - Core scheduling logic
-- `src/core/executor/index.ts` - Command execution
+- `src/core/executor/index.ts` - Basic command execution
+- `src/core/executor/agent-sdk-executor.ts` - Agent SDK execution
 - `src/core/execution-store.ts` - Execution result storage
+- `src/core/session-manager/` - Session management
 - `src/models/task.ts` - Task data model
 
 ---
@@ -245,59 +345,19 @@ pnpm test --coverage
 ## Git Management
 
 ### Branch Strategy
-- **Main branch**: `main` (production-ready code)
+- **Staging branch**: `staging` (development verification - PR target, human merges after review)
 - **Temporary branches**: `feature/*`, `fix/*`, `refactor/*`, `release/*`
 - **Worktree location**: `.worktrees/`
 
-### Commit Convention
-Uses [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Code style (formatting, no logic change)
-- `refactor`: Code refactoring
-- `perf`: Performance improvement
-- `test`: Adding/updating tests
-- `build`: Build system or dependencies
-- `ci`: CI/CD configuration
-- `chore`: Maintenance tasks
-- `revert`: Reverting previous commits
-
-**Examples:**
-```
-feat: add task scheduler support
-fix: resolve memory leak in executor
-docs: update API documentation
-refactor: simplify cron parser logic
-```
-
-### Tools
-
-- **husky**: Git hooks for commit validation
-- **commitlint**: Validates commit messages against Conventional Commits
-- **semantic-release**: Automated versioning and package publishing
-
 ### Workflow
+1. Create a feature branch from `staging`: `git checkout -b feature/xxx origin/staging`
+2. Develop and test in the feature branch
+3. Push and create PR to `staging`: `gh pr create --base staging`
+4. Owner reviews PR on GitHub and merges after approval
 
-1. Create a worktree for new feature:
-   ```bash
-   git worktree add .worktrees/feature-name -b feature/feature-name
-   ```
-
-2. Make changes and commit:
-   ```bash
-   git add .
-   git commit -m "feat: add new feature"
-   ```
-
-3. After completing work, use `superpowers:finishing-a-development-branch` to merge or create PR.
+### Branch Structure
+```
+staging  (PR target, CI runs here)
+  ↑
+feature/*, fix/* (development)
+```

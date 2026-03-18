@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import * as child_process from 'child_process';
 import { TaskManager } from '../core/task-manager';
 import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
@@ -8,37 +9,64 @@ import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
 import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { TaskLoader } from '../core/task-loader';
-import { SingletonLock, SingletonLockError } from '../utils/singleton-lock';
+import { SingletonLock, SingletonLockError, getLockPort } from '../utils/singleton-lock';
+import { getDaemonManager } from './daemon';
 
 interface RunOptions {
   local?: boolean;
+  daemon?: boolean;
 }
 
 export async function handleRun(options: RunOptions = {}): Promise<void> {
+  const { local = false, daemon = false } = options;
+
+  // Handle daemon mode
+  if (daemon) {
+    const manager = getDaemonManager(local);
+
+    // Check if already running
+    if (await manager.isRunning()) {
+      console.error(`Daemon is already running (port ${getLockPort()})`);
+      process.exit(1);
+    }
+
+    // Fork to background
+    const args = process.argv.slice(2).filter((arg) => arg !== '-d' && arg !== '--daemon');
+
+    const child = child_process.spawn(process.execPath, ['dist/index.js', 'start', ...args], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: process.cwd(),
+      env: { ...process.env },
+    });
+
+    child.unref();
+
+    console.log(`Daemon started (PID: ${child.pid})`);
+    process.exit(0);
+    return;
+  }
+
+  // Foreground mode - original logic
   const config = await loadConfig();
 
   // Determine base directory based on mode
-  // Production mode: ~/.cadence/ (pointing to .cadence directory itself)
-  // Development mode (--local): process.cwd()/.cadence/
+  // Production mode: ~/.cadence/
+  // Development mode (--local): process.cwd()/
   const baseDir = options.local
-    ? path.join(process.cwd(), '.cadence')
+    ? process.cwd()
     : path.join(os.homedir(), '.cadence');
 
   console.log(`Running in ${options.local ? 'local' : 'global'} mode`);
   console.log(`Base directory: ${baseDir}`);
 
   // Acquire singleton lock FIRST
-  const lock = new SingletonLock({ port: 9876 });
-  let lockHandle: Awaited<ReturnType<typeof lock.acquire>> | undefined;
+  const lock = new SingletonLock({ port: getLockPort() });
   try {
-    lockHandle = await lock.acquire();
+    await lock.acquire();
   } catch (err) {
     if (err instanceof SingletonLockError) {
       console.error('Error:', err.message);
-      if (err.cause) {
-        console.error('Cause:', err.cause);
-      }
       process.exit(1);
     }
     throw err;
@@ -56,28 +84,28 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   logger.info('Cadence scheduler starting...');
 
-  // Load tasks from .cadence/tasks/ directory
-  // baseDir already points to .cadence directory, so use it directly
-  const tasksDir = path.join(baseDir, 'tasks');
+  // Load all tasks from TaskManager
+  const tasks = await taskManager.listTasks();
 
-  try {
-    await fs.access(tasksDir);
-    // .cadence/tasks exists, load tasks
-    const loader = new TaskLoader(baseDir);
-    const tasks = await loader.loadTasks();
+  if (tasks.length > 0) {
+    console.log(`Loaded ${tasks.length} task(s)`);
 
-    if (tasks.length > 0) {
-      console.log(`Loaded ${tasks.length} task(s) from .cadence/tasks/`);
-
-      // Add loaded tasks to scheduler
-      for (const task of tasks) {
-        await scheduler.addTask(task);
-        logger.info('Scheduled task from file', { taskId: task.id, name: task.name });
+    // Add tasks to scheduler
+    for (const task of tasks) {
+      // Load commandFile content if not already loaded
+      if (!task.execution.command && task.execution.commandFile) {
+        const tasksDir = path.join(baseDir, 'tasks');
+        const commandPath = path.resolve(tasksDir, task.execution.commandFile);
+        try {
+          task.execution.command = await fs.readFile(commandPath, 'utf-8');
+        } catch {
+          logger.warn('Could not load commandFile', { taskId: task.id });
+          continue;
+        }
       }
+      await scheduler.addTask(task);
+      logger.info('Scheduled task', { taskId: task.id, name: task.name });
     }
-  } catch {
-    // No .cadence/tasks directory, skip
-    logger.info('No .cadence/tasks directory found, using database tasks only');
   }
 
   // Setup task trigger handler
@@ -131,7 +159,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   // Handle shutdown signals
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();
@@ -140,7 +168,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down...');
-    await lockHandle?.release();
+    await lock.release();
     await scheduler.stop();
     await taskManager.close();
     executor.close();
