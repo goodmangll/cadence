@@ -71,7 +71,8 @@ export class Executor {
     // 空 close 方法，保持兼容性
   }
 
-  async stop(_taskId: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async stop(taskId: string): Promise<void> {
     // 空 stop 方法，保持兼容性
   }
 }
