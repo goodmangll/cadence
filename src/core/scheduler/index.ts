@@ -40,22 +40,32 @@ export class Scheduler {
     this.initialized = false;
   }
 
-  async start(onTaskTrigger?: (task: Task) => Promise<void>): Promise<void> {
+  async start(tasksOrCallback?: Task[] | ((task: Task) => Promise<void>), maybeCallback?: (task: Task) => Promise<void>): Promise<void> {
     if (this.running) {
       logger.warn('Scheduler is already running');
       return;
     }
 
+    let tasks: Task[] | undefined;
+    let onTaskTrigger: ((task: Task) => Promise<void>) | undefined;
+
+    if (Array.isArray(tasksOrCallback)) {
+      tasks = tasksOrCallback;
+      onTaskTrigger = maybeCallback;
+    } else {
+      onTaskTrigger = tasksOrCallback;
+    }
+
     this.onTaskTrigger = onTaskTrigger;
     this.running = true;
 
-    // Load and schedule all enabled tasks
-    const tasks = await this.store.loadTasks({ enabled: true });
-    for (const task of tasks) {
+    // Schedule tasks: use provided tasks or load from store
+    const tasksToSchedule = tasks || await this.store.loadTasks({ enabled: true });
+    for (const task of tasksToSchedule) {
       await this.scheduleTask(task);
     }
 
-    logger.info('Scheduler started', { tasksCount: tasks.length });
+    logger.info('Scheduler started', { tasksCount: tasksToSchedule.length });
   }
 
   async stop(): Promise<void> {

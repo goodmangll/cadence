@@ -17,12 +17,12 @@ export function validateCron(expression: string): boolean {
   }
 }
 
-export function parseCron(expression: string): CronExpression {
+export function parseCron(expression: string, timezone?: string): CronExpression {
   if (!validateCron(expression)) {
     throw new Error(`Invalid cron expression: ${expression}`);
   }
 
-  return { expression };
+  return { expression, timezone };
 }
 
 // Get max value for a cron field
@@ -63,7 +63,14 @@ function parseCronFields(expression: string): {
 
   const result: Record<string, number[]> = {};
   parts.forEach((part, index) => {
-    result[fieldTypes[index]] = parseField(part, fieldTypes[index]);
+    let parsed = parseField(part, fieldTypes[index]);
+    // For daysOfWeek, normalize 7 to 0 (both mean Sunday)
+    if (fieldTypes[index] === 'daysOfWeek') {
+      parsed = parsed.map(d => d === 7 ? 0 : d);
+      // Remove duplicates
+      parsed = [...new Set(parsed)];
+    }
+    result[fieldTypes[index]] = parsed;
   });
 
   return result as {
@@ -110,13 +117,22 @@ export function getNextRunTime(
   from: Date = new Date()
 ): Date | null {
   try {
+    // Validate cron expression first
+    if (!validateCron(cronExpr.expression)) {
+      return null;
+    }
+
     const fields = parseCronFields(cronExpr.expression);
     const now = new Date(from);
 
-    // Start from the next minute
+    // Start from the next minute (don't match the current time)
     now.setSeconds(0);
     now.setMilliseconds(0);
     now.setMinutes(now.getMinutes() + 1);
+
+    // Check if daysOfWeek has all values (0-6 after normalization, 7 values)
+    const isDayOfMonthWildcard = fields.daysOfMonth.length === 31;
+    const isDayOfWeekWildcard = fields.daysOfWeek.length === 7;
 
     // Try up to 366 days to find next match
     for (let i = 0; i < 366 * 24 * 60; i++) {
@@ -132,13 +148,25 @@ export function getNextRunTime(
       const dowMatch = fields.daysOfWeek.includes(dayOfWeek);
       const hourMatch = fields.hours.includes(hour);
       const minuteMatch = fields.minutes.includes(minute);
+      const secondMatch = !fields.seconds || fields.seconds.includes(0); // We're on 0 seconds
 
-      // In cron, day-of-month and day-of-week are OR'd if both are specified
-      const dayOk = (fields.daysOfMonth.length === 31 || fields.daysOfWeek.length === 7)
-        ? (monthMatch && (dayMatch || dowMatch))
-        : (monthMatch && dayMatch && dowMatch);
+      // In cron, day-of-month and day-of-week are OR'd if either is not *
+      // Standard cron logic:
+      // - If both are * (wildcard), match any day
+      // - If one is * and the other is not, only match the non-wildcard one
+      // - If both are not *, OR them (match either)
+      let dayOk: boolean;
+      if (isDayOfMonthWildcard && isDayOfWeekWildcard) {
+        dayOk = monthMatch; // Any day is fine
+      } else if (isDayOfMonthWildcard) {
+        dayOk = monthMatch && dowMatch; // Only match day-of-week
+      } else if (isDayOfWeekWildcard) {
+        dayOk = monthMatch && dayMatch; // Only match day-of-month
+      } else {
+        dayOk = monthMatch && (dayMatch || dowMatch); // Match either
+      }
 
-      if (dayOk && hourMatch && minuteMatch) {
+      if (dayOk && hourMatch && minuteMatch && secondMatch) {
         return new Date(now);
       }
 
@@ -147,8 +175,7 @@ export function getNextRunTime(
     }
 
     return null;
-  } catch (error) {
-    console.error('Error calculating next run time:', error);
+  } catch {
     return null;
   }
 }
