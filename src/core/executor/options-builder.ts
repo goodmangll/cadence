@@ -1,4 +1,7 @@
-import { Task } from '../../models/task';
+import { Task, SettingSource } from '../../models/task';
+
+// 默认配置来源
+const DEFAULT_SETTING_SOURCES: SettingSource[] = ['project', 'user'];
 
 // 默认工具列表
 const DEFAULT_TOOLS = [
@@ -31,12 +34,18 @@ export class OptionsBuilder {
    * 构建基础选项
    */
   static build(task: Task): AgentSdkOptions {
+    // 处理 settingSources：使用任务配置，否则使用默认值
+    const settingSources = task.execution.settingSources || DEFAULT_SETTING_SOURCES;
+
+    // 处理 skipPermissions：使用任务配置，否则默认 true（保持向后兼容）
+    const skipPermissions = task.execution.skipPermissions ?? true;
+
     const options: AgentSdkOptions = {
       cwd: task.execution.workingDir,
-      settingSources: task.execution.settingSources,
+      settingSources,
       allowedTools: task.execution.allowedTools || DEFAULT_TOOLS,
       maxTurns: 10,
-      allowDangerouslySkipPermissions: true,
+      allowDangerouslySkipPermissions: skipPermissions,
     };
 
     if (task.execution.mcpServers) {
