@@ -16,6 +16,7 @@ export interface ExecutionRecord {
   };
   structured_output?: unknown;
   outputFile?: string;
+  error?: string;
 }
 
 export interface SaveExecutionParams {
@@ -28,6 +29,7 @@ export interface SaveExecutionParams {
   usage?: { input_tokens: number; output_tokens: number };
   structured_output?: unknown;
   output?: string;
+  error?: string;
 }
 
 export interface ExecutionFilter {
@@ -61,13 +63,14 @@ export class ExecutionStore {
     const hasStructured = !!params.structured_output;
     const outputFile = hasStructured ? 'output.json' : 'output.md';
 
-    // Save output file
-    if (params.output || params.structured_output) {
+    // Save output file - use error if output not available
+    const outputToSave = params.output || params.error;
+    if (outputToSave || params.structured_output) {
       const outputPath = path.join(execSubDir, outputFile);
       if (hasStructured) {
         await fs.writeFile(outputPath, JSON.stringify(params.structured_output, null, 2));
-      } else if (params.output) {
-        await fs.writeFile(outputPath, params.output);
+      } else if (outputToSave) {
+        await fs.writeFile(outputPath, outputToSave);
       }
     }
 
@@ -82,7 +85,8 @@ export class ExecutionStore {
       cost: params.cost,
       usage: params.usage,
       structured_output: params.structured_output,
-      outputFile: params.output || params.structured_output ? outputFile : undefined,
+      outputFile: outputToSave || params.structured_output ? outputFile : undefined,
+      error: params.error,
     };
 
     const resultPath = path.join(execSubDir, 'result.json');
