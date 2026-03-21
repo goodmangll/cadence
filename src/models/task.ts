@@ -18,6 +18,7 @@ export interface ExecutionConfig {
   workingDir?: string;
   timeout?: number;
   settingSources?: SettingSource[];
+  skipPermissions?: boolean;
   allowedTools?: string[];
   disallowedTools?: string[];
   mcpServers?: Record<string, {
