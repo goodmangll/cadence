@@ -4,6 +4,7 @@ import { FileStore } from '../store/file-store';
 import { Task } from '../../models/task';
 import { parseCron, getNextRunTime, resolveAlias } from './cron-parser';
 import { logger } from '../../utils/logger';
+import { formatLocalTime } from '../../utils/date-format';
 
 interface ScheduledTask {
   task: Task;
@@ -178,7 +179,7 @@ export class Scheduler {
       taskId: task.id,
       name: task.name,
       expression: cronExpr.expression,
-      nextRun: nextRun?.toISOString(),
+      nextRun: nextRun ? formatLocalTime(nextRun) : undefined,
     });
   }
 
