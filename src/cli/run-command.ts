@@ -95,7 +95,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
     for (const task of tasks) {
       // Load commandFile content if not already loaded
       if (!task.execution.command && task.execution.commandFile) {
-        const tasksDir = path.join(baseDir, 'tasks');
+        const tasksDir = path.join(baseDir, '.cadence', 'tasks');
         const commandPath = path.resolve(tasksDir, task.execution.commandFile);
         try {
           task.execution.command = await fs.readFile(commandPath, 'utf-8');
