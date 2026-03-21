@@ -376,7 +376,8 @@ cat .cadence/executions/{task-id}/{timestamp}/output.md
 1. Create a feature branch from `staging`: `git checkout -b feature/xxx origin/staging`
 2. Develop and test in the feature branch
 3. Push and create PR to `staging`: `gh pr create --base staging`
-4. Owner reviews PR on GitHub and merges after approval
+4. **CR PR content before merging**: Verify that spec and plan files exist in `docs/superpowers/specs/` and `docs/superpowers/plans/`
+5. Owner reviews PR on GitHub and merges after approval
 
 ### Branch Structure
 ```
