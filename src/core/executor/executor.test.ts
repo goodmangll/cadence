@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AgentSDKExecutor } from './agent-sdk-executor';
+import { Executor } from './executor';
 import { Task } from '../../models/task';
 import { v4 as uuidv4 } from 'uuid';
 
-describe('AgentSDKExecutor', () => {
-  let executor: AgentSDKExecutor;
+describe('Executor', () => {
+  let executor: Executor;
 
   beforeEach(() => {
-    executor = new AgentSDKExecutor({ defaultTimeout: 60 });
+    executor = new Executor({ defaultTimeout: 60 });
   });
 
   afterEach(() => {

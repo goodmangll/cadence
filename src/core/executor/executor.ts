@@ -8,20 +8,20 @@ import {
 import { MessageCollector } from './message-collector';
 import { OptionsBuilder } from './options-builder';
 
-export interface AgentSDKExecutorOptions {
+export interface ExecutorOptions {
   defaultTimeout?: number;
 }
 
 /**
  * Agent SDK 执行器
  */
-export class AgentSDKExecutor {
+export class Executor {
   private defaultTimeout: number;
   private sessionManager: SessionManager;
   private singleTurnStrategy: SingleTurnExecutionStrategy;
   private multiTurnStrategy: MultiTurnSessionStrategy;
 
-  constructor(options: AgentSDKExecutorOptions = {}) {
+  constructor(options: ExecutorOptions = {}) {
     this.defaultTimeout = options.defaultTimeout ?? -1;
     this.sessionManager = new SessionManager();
 
@@ -69,5 +69,9 @@ export class AgentSDKExecutor {
 
   close(): void {
     // 空 close 方法，保持兼容性
+  }
+
+  async stop(taskId: string): Promise<void> {
+    // 空 stop 方法，保持兼容性
   }
 }
