@@ -71,7 +71,7 @@ export class Executor {
     // 空 close 方法，保持兼容性
   }
 
-  async stop(taskId: string): Promise<void> {
+  async stop(_taskId: string): Promise<void> {
     // 空 stop 方法，保持兼容性
   }
 }
