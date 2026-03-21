@@ -1,5 +1,6 @@
 import { FileStore } from '../core/store/file-store';
 import { parseCron, getNextRunTime } from '../core/scheduler/cron-parser';
+import { formatLocalTime } from '../utils/date-format';
 
 export async function handleStatus(): Promise<void> {
   const store = new FileStore(process.cwd());
@@ -32,7 +33,7 @@ export async function handleStatus(): Promise<void> {
           const parsed = parseCron(task.trigger.expression);
           const nextRun = getNextRunTime(parsed, new Date());
           if (nextRun) {
-            console.log(`│  Next: ${nextRun.toISOString()}`);
+            console.log(`│  Next: ${formatLocalTime(nextRun)}`);
           }
         } catch {
           // Ignore cron parsing errors

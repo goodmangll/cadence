@@ -86,11 +86,12 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
 
   // Load all tasks from TaskManager
   const tasks = await taskManager.listTasks();
+  const tasksWithCommands: Task[] = [];
 
   if (tasks.length > 0) {
     console.log(`Loaded ${tasks.length} task(s)`);
 
-    // Add tasks to scheduler
+    // Load commandFile content for tasks
     for (const task of tasks) {
       // Load commandFile content if not already loaded
       if (!task.execution.command && task.execution.commandFile) {
@@ -103,13 +104,12 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
           continue;
         }
       }
-      await scheduler.addTask(task);
-      logger.info('Scheduled task', { taskId: task.id, name: task.name });
+      tasksWithCommands.push(task);
     }
   }
 
-  // Setup task trigger handler
-  await scheduler.start(async (task: Task) => {
+  // Setup task trigger handler and start scheduler with pre-loaded tasks
+  await scheduler.start(tasksWithCommands, async (task: Task) => {
     logger.info('Executing task', { taskId: task.id, name: task.name });
 
     const startedAt = new Date();

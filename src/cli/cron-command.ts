@@ -1,4 +1,5 @@
 import { parseCron, getNextRunTime, validateCron } from '../core/scheduler/cron-parser';
+import { formatLocalTime } from '../utils/date-format';
 
 interface CronOptions {
   timezone?: string;
@@ -40,7 +41,7 @@ export async function handleCron(expression: string, options: CronOptions): Prom
     }, null, 2));
   } else {
     console.log(`Expression: ${expression}`);
-    console.log(`Timezone: ${parsed.timezone || 'UTC'}`);
+    console.log(`Timezone: ${parsed.timezone || 'local'}`);
 
     if (nextRuns.length === 0) {
       console.log('No upcoming run found');
@@ -62,9 +63,9 @@ export async function handleCron(expression: string, options: CronOptions): Prom
         }
 
         if (count > 1) {
-          console.log(`\nRun #${index + 1}: ${nextRun.toISOString()} ${timeDesc}`);
+          console.log(`\nRun #${index + 1}: ${formatLocalTime(nextRun)} ${timeDesc}`);
         } else {
-          console.log(`\nNext run: ${nextRun.toISOString()} ${timeDesc}`);
+          console.log(`\nNext run: ${formatLocalTime(nextRun)} ${timeDesc}`);
         }
       });
     }
