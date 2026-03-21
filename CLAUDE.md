@@ -227,6 +227,29 @@ timezone: Asia/Shanghai
 workingDir: /path/to/project
 ```
 
+### 任务权限配置
+
+任务支持以下权限相关配置：
+
+```yaml
+# 任务定义示例
+name: 分析代码库
+execution:
+  command: "分析代码库"
+  workingDir: "/path/to/project"
+  settingSources: ["project", "user"]  # 可选，默认 ["project", "user"]
+  skipPermissions: true                 # 可选，默认 true
+  allowedTools: ["Read", "Glob"]       # 可选
+  disallowedTools: ["Bash"]            # 可选
+```
+
+| 配置 | 说明 |
+|-----|------|
+| `settingSources` | 配置文件来源，可选 `project`、`user`、`local` |
+| `skipPermissions` | 是否跳过权限检查，默认 `true` |
+| `allowedTools` | 允许的工具列表 |
+| `disallowedTools` | 禁止的工具列表 |
+
 ### Execution Storage
 Executions stored at: `{project}/.cadence/executions/{task-id}/{timestamp}/`
 - `result.json` - Execution metadata
