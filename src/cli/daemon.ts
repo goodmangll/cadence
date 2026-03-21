@@ -1,4 +1,8 @@
+import { promisify } from 'util';
+import { exec as execCallback } from 'child_process';
 import { SingletonLock, DEV_PORT, PROD_PORT } from '../utils/singleton-lock';
+
+const exec = promisify(execCallback);
 
 export class DaemonManager {
   private port: number;
@@ -25,19 +29,73 @@ export function getDaemonManager(local: boolean = false): DaemonManager {
 }
 
 export async function handleStop(local: boolean = false): Promise<void> {
+  const port = local ? DEV_PORT : PROD_PORT;
   const manager = getDaemonManager(local);
   const running = await manager.isRunning();
 
   if (!running) {
-    console.log('Daemon is not running');
+    console.log('Cadence is not running');
     return;
   }
 
-  // 由于使用端口检测，无法直接发送信号给进程
-  // 用户需要手动停止进程或使用其他方式
-  console.log('Daemon is running but cannot be stopped remotely via port detection.');
-  console.log('Please stop the process manually or use: kill $(lsof -t -i:PORT)');
-  console.log(`Port: ${local ? DEV_PORT : PROD_PORT}`);
+  try {
+    let pids: string[];
+
+    if (process.platform === 'win32') {
+      // Windows: 使用 netstat 查找占用端口的进程
+      const { stdout } = await exec(`netstat -ano | findstr :${port}`);
+      const lines = stdout.trim().split('\n');
+      pids = lines
+        .map(line => {
+          const match = line.match(/\s+(\d+)\s*$/);
+          return match ? match[1] : null;
+        })
+        .filter((pid): pid is string => pid !== null);
+    } else {
+      // macOS/Linux: 使用 lsof
+      const { stdout } = await exec(`lsof -t -i:${port}`);
+      pids = stdout.trim().split('\n').filter(pid => pid.length > 0);
+    }
+
+    if (pids.length === 0) {
+      console.log('No PID found');
+      return;
+    }
+
+    // Kill 所有找到的进程
+    for (const pidStr of pids) {
+      const pid = parseInt(pidStr, 10);
+      if (isNaN(pid)) continue;
+
+      try {
+        if (process.platform === 'win32') {
+          await exec(`taskkill /PID ${pid} /F`);
+        } else {
+          process.kill(pid, 'SIGTERM');
+        }
+        console.log(`Stopped Cadence (PID: ${pid})`);
+      } catch (killError) {
+        console.log(`Failed to kill process ${pid}, please try manually: ${
+          process.platform === 'win32' ? `taskkill /PID ${pid} /F` : `kill ${pid}`
+        }`);
+      }
+    }
+
+    // 等待端口释放
+    let waited = 0;
+    while (waited < 3000) {
+      const stillRunning = await manager.isRunning();
+      if (!stillRunning) break;
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
+    }
+  } catch (error) {
+    const portCmd = process.platform === 'win32'
+      ? `for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port}') do taskkill /PID %a /F`
+      : `kill $(lsof -t -i:${port})`;
+    console.log('Cannot find process via automatic detection, please stop manually:');
+    console.log(`  ${portCmd}`);
+  }
 }
 
 export async function handleRestart(local: boolean = false): Promise<void> {
@@ -45,26 +103,41 @@ export async function handleRestart(local: boolean = false): Promise<void> {
   const running = await manager.isRunning();
 
   if (running) {
-    console.log('Daemon is running, stopping first...');
+    console.log('Cadence is running, stopping first...');
     await handleStop(local);
   }
 
-  console.log('Starting daemon...');
+  console.log('Starting Cadence...');
 
-  // Need to spawn a new process
   const { spawn } = await import('child_process');
-  const child = spawn(
-    process.execPath,
-    ['dist/index.js', 'start', '-d', ...(local ? ['--local'] : [])],
-    {
-      detached: true,
-      stdio: 'ignore',
-      cwd: process.cwd(),
-    }
-  );
-  child.unref();
 
-  console.log('Daemon started');
+  if (local) {
+    // 开发模式：启动前台模式但作为 detached 进程（后台运行）
+    const child = spawn(
+      process.execPath,
+      ['dist/index.js', 'start', '--local'],
+      {
+        detached: true,
+        stdio: 'ignore',
+        cwd: process.cwd(),
+      }
+    );
+    child.unref();
+  } else {
+    // 生产模式：使用 daemon 模式（-d）
+    const child = spawn(
+      process.execPath,
+      ['dist/index.js', 'start', '-d'],
+      {
+        detached: true,
+        stdio: 'ignore',
+        cwd: process.cwd(),
+      }
+    );
+    child.unref();
+  }
+
+  console.log('Cadence started');
 }
 
 export async function handleDaemonStatus(): Promise<void> {
