@@ -95,7 +95,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
     for (const task of tasks) {
       // Load commandFile content if not already loaded
       if (!task.execution.command && task.execution.commandFile) {
-        const tasksDir = path.join(baseDir, 'tasks');
+        const tasksDir = path.join(baseDir, '.cadence', 'tasks');
         const commandPath = path.resolve(tasksDir, task.execution.commandFile);
         try {
           task.execution.command = await fs.readFile(commandPath, 'utf-8');
@@ -118,6 +118,14 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
       const result = await executor.execute(task);
       const finishedAt = new Date();
 
+      // 提取错误信息：优先用 result.error，如果没有且状态是 failed 则用 result.output
+      const errorMsg = result.status === 'failed'
+        ? (result as any).error || result.output || 'Task failed without error message'
+        : undefined;
+
+      // 确保 error 也作为 output 保存，这样会生成 output.md
+      const outputToSave = result.output || errorMsg;
+
       // Save using ExecutionStore
       await execStore.saveExecution(task.id, {
         taskId: task.id,
@@ -126,15 +134,26 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
         finishedAt,
         durationMs: result.duration || (finishedAt.getTime() - startedAt.getTime()),
         cost: result.cost,
-        output: result.output,
+        output: outputToSave,
+        error: errorMsg,
         structured_output: result.structuredOutput,
       });
 
-      logger.info('Task execution completed', {
-        taskId: task.id,
-        status: result.status,
-        duration: result.duration,
-      });
+      // 日志输出
+      if (result.status === 'failed') {
+        logger.error('Task execution completed', {
+          taskId: task.id,
+          status: result.status,
+          error: errorMsg,
+          duration: result.duration,
+        });
+      } else {
+        logger.info('Task execution completed', {
+          taskId: task.id,
+          status: result.status,
+          duration: result.duration,
+        });
+      }
     } catch (error: unknown) {
       const finishedAt = new Date();
       const errorMsg = error instanceof Error ? error.message : String(error);

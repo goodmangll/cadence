@@ -117,4 +117,45 @@ describe('ExecutionStore', () => {
 
     expect(output).toBe('Hello, World!');
   });
+
+  it('should save and load execution with error field', async () => {
+    const store = new ExecutionStore(TEST_DIR);
+    const taskId = 'test-task-error';
+    const startedAt = new Date('2024-01-01T00:00:00Z');
+    const finishedAt = new Date('2024-01-01T00:01:00Z');
+
+    const saved = await store.saveExecution(taskId, {
+      taskId,
+      status: 'failed',
+      startedAt,
+      finishedAt,
+      durationMs: 60000,
+      error: 'Task failed: API request timed out',
+    });
+
+    expect(saved.error).toBe('Task failed: API request timed out');
+
+    const executions = await store.listExecutions(taskId);
+    expect(executions.length).toBe(1);
+    expect(executions[0].error).toBe('Task failed: API request timed out');
+  });
+
+  it('should create output.md when error is provided but output is not', async () => {
+    const store = new ExecutionStore(TEST_DIR);
+    const taskId = 'test-task-error-output';
+    const startedAt = new Date('2024-01-01T00:00:00Z');
+    const finishedAt = new Date('2024-01-01T00:01:00Z');
+
+    await store.saveExecution(taskId, {
+      taskId,
+      status: 'failed',
+      startedAt,
+      finishedAt,
+      durationMs: 100,
+      error: 'Something went wrong',
+    });
+
+    const output = await store.getExecutionOutput(taskId, startedAt.toISOString().replace(/[:.]/g, '-').slice(0, 19));
+    expect(output).toBe('Something went wrong');
+  });
 });
