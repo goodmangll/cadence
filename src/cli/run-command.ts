@@ -75,7 +75,7 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   // Initialize components
   const taskManager = new TaskManager(baseDir);
   const scheduler = new Scheduler(baseDir);
-  const executor = new Executor({ defaultTimeout: config.scheduler.maxConcurrent });
+  const executor = new Executor({ defaultTimeout: -1 });
   const execStore = new ExecutionStore(baseDir);
 
   // Initialize all components
