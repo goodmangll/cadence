@@ -385,3 +385,63 @@ staging  (PR target, CI runs here)
   ↑
 feature/*, fix/* (development)
 ```
+
+### Worktree Development
+
+**Worktree directory**: `.worktrees/` (已添加到 .gitignore)
+
+#### 开发测试流程
+
+```bash
+# 1. 进入 worktree 目录
+cd .worktrees/<branch-name>
+
+# 2. 安装依赖（如果 worktree 是新建的）
+pnpm install
+
+# 3. 构建项目
+pnpm run build
+
+# 4. 运行测试验证 clean baseline
+pnpm test
+
+# 5. 开发/修改代码...
+
+# 6. 再次运行测试验证
+pnpm test
+```
+
+**快速验证**:
+```bash
+./dev.sh verify   # 运行: type-check + lint + build + test
+```
+
+#### .cadence 目录说明
+
+`.cadence/` 已在 `.gitignore` 中，**每个 worktree 有独立的 `.cadence` 目录**，不会影响主项目。
+
+**两种测试模式**:
+1. **独立测试**（推荐）: 每个 worktree 有自己的 `.cadence/tasks/`，测试 task 需要单独创建
+2. **共享 .cadence**: 可通过符号链接共享，但不推荐（可能导致调度器冲突）
+
+**共享 .cadence（可选）**:
+```bash
+cd .worktrees/my-feature
+ln -s ../../.cadence .cadence
+```
+
+#### 查看现有 worktrees
+
+```bash
+git worktree list
+```
+
+#### 创建新 worktree
+
+```bash
+git worktree add .worktrees/<branch-name> -b feature/<feature-name>
+cd .worktrees/<branch-name>
+pnpm install
+pnpm run build
+pnpm test
+```
