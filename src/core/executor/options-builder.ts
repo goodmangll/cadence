@@ -1,3 +1,4 @@
+import os from 'os';
 import { Task, SettingSource } from '../../models/task';
 
 // 默认配置来源
@@ -31,6 +32,19 @@ export interface AgentSdkOptions {
  */
 export class OptionsBuilder {
   /**
+   * 展开路径中的 ~ 为用户主目录
+   */
+  private static expandPath(pathStr: string): string {
+    if (pathStr === '~') {
+      return os.homedir();
+    }
+    if (pathStr.startsWith('~/')) {
+      return os.homedir() + pathStr.slice(1);
+    }
+    return pathStr;
+  }
+
+  /**
    * 构建基础选项
    */
   static build(task: Task): AgentSdkOptions {
@@ -41,7 +55,9 @@ export class OptionsBuilder {
     const skipPermissions = task.execution.skipPermissions ?? true;
 
     const options: AgentSdkOptions = {
-      cwd: task.execution.workingDir,
+      cwd: task.execution.workingDir
+        ? OptionsBuilder.expandPath(task.execution.workingDir)
+        : undefined,
       settingSources,
       allowedTools: task.execution.allowedTools || DEFAULT_TOOLS,
       maxTurns: 10,
