@@ -118,9 +118,9 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
       const result = await executor.execute(task);
       const finishedAt = new Date();
 
-      // 提取错误信息：优先用 result.error，如果没有且状态是 failed 则用 result.output
+      // 提取错误信息：优先用 result.output（真实错误详情），其次用 result.error（SDK 包装的错误）
       const errorMsg = result.status === 'failed'
-        ? (result as any).error || result.output || 'Task failed without error message'
+        ? result.output || (result as any).error || 'Task failed without error message'
         : undefined;
 
       // 确保 error 也作为 output 保存，这样会生成 output.md
