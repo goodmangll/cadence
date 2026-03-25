@@ -24,6 +24,9 @@ export type {
   SDKSystemMessage,
   SDKHookResponseMessage,
   SDKAuthStatusMessage,
+  SDKPartialAssistantMessage,
+  SDKCompactBoundaryMessage,
+  SDKStatusMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'failed' | 'timeout';

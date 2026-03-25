@@ -31,6 +31,8 @@ describe('Executor', () => {
     const result = await executor.execute(task);
     expect(result).toBeDefined();
     expect(result.status).toBeDefined();
+    // 新架构应该正确返回 success/failed 而不是总是返回一种状态
+    expect(['success', 'failed', 'timeout']).toContain(result.status);
   }, 60000); // 60s timeout for actual execution
 
   it('should handle execution timeout', async () => {
