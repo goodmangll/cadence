@@ -7,6 +7,22 @@ import type {
 import type { StateManager } from '../state-manager';
 import type { OutputCollector } from '../output-collector';
 
+interface SDKErrorResultMessage {
+  type: 'result';
+  subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd' | 'error_max_structured_output_retries';
+  duration_ms: number;
+  duration_api_ms: number;
+  is_error: boolean;
+  num_turns: number;
+  total_cost_usd: number;
+  usage: unknown;
+  modelUsage: Record<string, unknown>;
+  permission_denials: unknown[];
+  errors: string[];
+  uuid: string;
+  session_id: string;
+}
+
 export class ResultHandler {
   private state: StateManager;
   private output: OutputCollector;
@@ -26,7 +42,7 @@ export class ResultHandler {
     if (result.subtype === 'success') {
       this.handleSuccess(result);
     } else {
-      this.handleError(result);
+      this.handleError(result as SDKErrorResultMessage);
     }
   }
 
@@ -48,7 +64,7 @@ export class ResultHandler {
       this.state.setUsage(result.usage);
       this.state.setDuration(result.duration_ms, result.duration_api_ms);
       this.state.setNumTurns(result.num_turns);
-      this.state.setModelUsage(result.modelUsage);
+      this.state.setModelUsage(result.modelUsage as Record<string, unknown>);
       // 即使是 success subtype，如果有 is_error 标记，也应该标记为 failed
       this.state.setFailed();
       return;
@@ -70,12 +86,12 @@ export class ResultHandler {
     this.state.setUsage(result.usage);
     this.state.setDuration(result.duration_ms, result.duration_api_ms);
     this.state.setNumTurns(result.num_turns);
-    this.state.setModelUsage(result.modelUsage);
+    this.state.setModelUsage(result.modelUsage as Record<string, unknown>);
 
     this.state.setSuccess();
   }
 
-  private handleError(result: SDKResultMessage & { subtype: Exclude<string, 'success'> }): void {
+  private handleError(result: SDKErrorResultMessage): void {
     // 设置错误输出
     if (result.errors && result.errors.length > 0) {
       this.output.setMainOutput(result.errors.join('\n'));

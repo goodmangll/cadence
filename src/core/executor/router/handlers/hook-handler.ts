@@ -2,7 +2,6 @@
 
 import type {
   SDKMessage,
-  SDKSystemMessage,
   SDKHookResponseMessage,
   SDKAuthStatusMessage,
   HookEventInfo,
@@ -30,24 +29,16 @@ export class HookHandler {
     if (message.type === 'system') {
       this.handleSystem(message);
     } else if (message.type === 'auth_status') {
-      this.handleAuthStatus(message);
+      this.handleAuthStatus(message as SDKAuthStatusMessage);
     }
   }
 
-  private handleSystem(message: SDKSystemMessage): void {
-    // 使用类型守卫检查 subtype
-    if (this.isHookResponse(message)) {
-      this.handleHookResponse(message);
+  private handleSystem(message: SDKMessage & { subtype?: string }): void {
+    // Check subtype to determine which handler to call
+    if (message.subtype === 'hook_response') {
+      this.handleHookResponse(message as SDKHookResponseMessage);
     }
-    // 其他 system 子类型（如 init, compact_boundary, status）在此忽略
-  }
-
-  private isHookResponse(msg: SDKSystemMessage): msg is SDKSystemMessage & { subtype: 'hook_response' } {
-    return msg.subtype === 'hook_response';
-  }
-
-  private isHookResponseMessage(msg: SDKSystemMessage): msg is SDKHookResponseMessage {
-    return msg.subtype === 'hook_response';
+    // Other system subtypes (init, compact_boundary, status) are ignored
   }
 
   private handleHookResponse(message: SDKHookResponseMessage): void {
