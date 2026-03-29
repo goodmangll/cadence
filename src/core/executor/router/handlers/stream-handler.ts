@@ -2,7 +2,6 @@
 
 import type {
   SDKMessage,
-  SDKPartialAssistantMessage,
 } from '../types';
 import type { StateManager } from '../state-manager';
 import type { OutputCollector } from '../output-collector';

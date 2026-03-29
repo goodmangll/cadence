@@ -48,7 +48,8 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
   }
 
   // Foreground mode - original logic
-  const config = await loadConfig();
+  // Note: config loading kept for future use (e.g., global config integration)
+  const _config = await loadConfig();
 
   // Determine base directory based on mode
   // Production mode: ~/.cadence/

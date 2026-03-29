@@ -10,8 +10,6 @@ import type {
   SDKHookResponseMessage,
   SDKAuthStatusMessage,
   SDKPartialAssistantMessage,
-  SDKCompactBoundaryMessage,
-  SDKStatusMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
 // Re-export SDK types for convenience
@@ -25,8 +23,6 @@ export type {
   SDKHookResponseMessage,
   SDKAuthStatusMessage,
   SDKPartialAssistantMessage,
-  SDKCompactBoundaryMessage,
-  SDKStatusMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'failed' | 'timeout';

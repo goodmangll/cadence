@@ -1,7 +1,6 @@
 // src/core/executor/router/message-router.ts
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { ExecutionState, CollectedOutput } from './types';
 import { StateManager } from './state-manager';
 import { OutputCollector } from './output-collector';
 import {
