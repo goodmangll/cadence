@@ -7,7 +7,6 @@ import { Scheduler } from '../core/scheduler';
 import { Executor } from '../core/executor';
 import { ExecutionStore } from '../core/execution-store';
 import { Task } from '../models/task';
-import { loadConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { SingletonLock, SingletonLockError, getLockPort } from '../utils/singleton-lock';
 import { getDaemonManager } from './daemon';
