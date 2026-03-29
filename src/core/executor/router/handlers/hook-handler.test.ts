@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { HookHandler } from './hook-handler';
 import { StateManager } from '../state-manager';
 import { OutputCollector } from '../output-collector';
-import type { SDKHookResponseMessage, SDKAuthStatusMessage } from '../types';
+import type { SDKHookResponseMessage, SDKAuthStatusMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('HookHandler', () => {
   let handler: HookHandler;

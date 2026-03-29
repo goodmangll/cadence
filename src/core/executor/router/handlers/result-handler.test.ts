@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ResultHandler } from './result-handler';
 import { StateManager } from '../state-manager';
 import { OutputCollector } from '../output-collector';
-import type { SDKResultMessage, SDKMessage } from '../types';
+import type { SDKResultMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('ResultHandler', () => {
   let handler: ResultHandler;

@@ -1,30 +1,5 @@
 // src/core/executor/router/types.ts
 
-import type {
-  SDKMessage,
-  SDKAssistantMessage,
-  SDKUserMessage,
-  SDKToolProgressMessage,
-  SDKResultMessage,
-  SDKSystemMessage,
-  SDKHookResponseMessage,
-  SDKAuthStatusMessage,
-  SDKPartialAssistantMessage,
-} from '@anthropic-ai/claude-agent-sdk';
-
-// Re-export SDK types for convenience
-export type {
-  SDKMessage,
-  SDKAssistantMessage,
-  SDKUserMessage,
-  SDKToolProgressMessage,
-  SDKResultMessage,
-  SDKSystemMessage,
-  SDKHookResponseMessage,
-  SDKAuthStatusMessage,
-  SDKPartialAssistantMessage,
-} from '@anthropic-ai/claude-agent-sdk';
-
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'failed' | 'timeout';
 
 export type ErrorType =

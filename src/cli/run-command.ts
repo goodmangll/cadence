@@ -47,9 +47,8 @@ export async function handleRun(options: RunOptions = {}): Promise<void> {
     return;
   }
 
-  // Foreground mode - original logic
-  // Note: config loading kept for future use (e.g., global config integration)
-  const _config = await loadConfig();
+  // Foreground mode - run scheduler directly
+  // Note: config loading can be added later for global config integration
 
   // Determine base directory based on mode
   // Production mode: ~/.cadence/

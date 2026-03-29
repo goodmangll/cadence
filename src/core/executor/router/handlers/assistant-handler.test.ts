@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { AssistantHandler } from './assistant-handler';
 import { StateManager } from '../state-manager';
 import { OutputCollector } from '../output-collector';
-import type { SDKAssistantMessage, SDKMessage } from '../types';
+import type { SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('AssistantHandler', () => {
   let handler: AssistantHandler;

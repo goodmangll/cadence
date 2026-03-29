@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolHandler } from './tool-handler';
 import { StateManager } from '../state-manager';
 import { OutputCollector } from '../output-collector';
-import type { SDKToolProgressMessage, SDKUserMessage } from '../types';
+import type { SDKToolProgressMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('ToolHandler', () => {
   let handler: ToolHandler;

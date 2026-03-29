@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { StreamHandler } from './stream-handler';
 import { StateManager } from '../state-manager';
 import { OutputCollector } from '../output-collector';
-import type { SDKPartialAssistantMessage, SDKMessage } from '../types';
+import type { SDKPartialAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('StreamHandler', () => {
   let handler: StreamHandler;

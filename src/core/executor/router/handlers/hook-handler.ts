@@ -1,11 +1,7 @@
 // src/core/executor/router/handlers/hook-handler.ts
 
-import type {
-  SDKMessage,
-  SDKHookResponseMessage,
-  SDKAuthStatusMessage,
-  HookEventInfo,
-} from '../types';
+import type { SDKMessage, SDKHookResponseMessage, SDKAuthStatusMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { HookEventInfo } from '../types';
 import type { StateManager } from '../state-manager';
 import type { OutputCollector } from '../output-collector';
 

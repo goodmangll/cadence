@@ -1,9 +1,6 @@
 // src/core/executor/router/handlers/assistant-handler.ts
 
-import type {
-  SDKMessage,
-  SDKAssistantMessage,
-} from '../types';
+import type { SDKMessage, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { StateManager } from '../state-manager';
 import type { OutputCollector } from '../output-collector';
 
