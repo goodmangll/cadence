@@ -19,14 +19,13 @@ export class ToolHandler {
   }
 
   canHandle(message: SDKMessage): boolean {
-    return message.type === 'tool_progress' || message.type === 'user' || message.type === 'user_replay';
+    return message.type === 'tool_progress' || message.type === 'user';
   }
 
   handle(message: SDKMessage): void {
     if (message.type === 'tool_progress') {
       this.handleToolProgress(message);
-    } else if (message.type === 'user' || message.type === 'user_replay') {
-      // user_replay 与 user 结构相同，可以统一处理
+    } else if (message.type === 'user') {
       this.handleUser(message as SDKUserMessage);
     }
   }

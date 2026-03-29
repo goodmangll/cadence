@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MessageRouter } from './message-router';
-import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKResultMessage, SDKToolProgressMessage, SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('MessageRouter', () => {
   let router: MessageRouter;
@@ -25,7 +25,7 @@ describe('MessageRouter', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       router.route(msg);
 
@@ -39,7 +39,7 @@ describe('MessageRouter', () => {
         tool_use_id: 'call-1',
         tool_name: 'Read',
         elapsed_time_seconds: 0.5,
-      };
+      } as unknown as SDKToolProgressMessage;
 
       router.route(msg);
 
@@ -50,7 +50,7 @@ describe('MessageRouter', () => {
       const msg = {
         type: 'assistant',
         message: { content: 'Hello' },
-      };
+      } as unknown as SDKAssistantMessage;
 
       router.route(msg);
 
@@ -59,8 +59,8 @@ describe('MessageRouter', () => {
 
     it('should ignore unknown message types', () => {
       const msg = {
-        type: 'unknown' as any,
-      };
+        type: 'unknown',
+      } as unknown as SDKMessage;
 
       // 应该不抛出错误
       router.route(msg);
@@ -82,7 +82,7 @@ describe('MessageRouter', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       router.route(msg);
       router.reset();

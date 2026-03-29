@@ -19,18 +19,18 @@ describe('ToolHandler', () => {
 
   describe('canHandle', () => {
     it('should handle tool_progress messages', () => {
-      const msg = { type: 'tool_progress' } as SDKToolProgressMessage;
+      const msg = { type: 'tool_progress' } as unknown as SDKToolProgressMessage;
       expect(handler.canHandle(msg)).toBe(true);
     });
 
     it('should handle user messages', () => {
-      const msg = { type: 'user', message: 'test' } as SDKUserMessage;
+      const msg = { type: 'user', message: 'test' } as unknown as SDKUserMessage;
       expect(handler.canHandle(msg)).toBe(true);
     });
 
-    it('should handle user_replay messages', () => {
-      const msg = { type: 'user_replay', message: 'test' };
-      expect(handler.canHandle(msg)).toBe(true);
+    it('should not handle other message types', () => {
+      const msg = { type: 'assistant' } as unknown as SDKToolProgressMessage;
+      expect(handler.canHandle(msg)).toBe(false);
     });
   });
 
@@ -41,7 +41,7 @@ describe('ToolHandler', () => {
         tool_use_id: 'call-1',
         tool_name: 'Read',
         elapsed_time_seconds: 0.5,
-      } as SDKToolProgressMessage;
+      } as unknown as SDKToolProgressMessage;
 
       handler.handle(msg);
 
@@ -55,7 +55,7 @@ describe('ToolHandler', () => {
       const msg = {
         type: 'user',
         message: 'Hello world',
-      } as SDKUserMessage;
+      } as unknown as SDKUserMessage;
 
       handler.handle(msg);
       expect(output.snapshot().text).toBe('Hello world');

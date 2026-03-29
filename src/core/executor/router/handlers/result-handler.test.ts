@@ -19,12 +19,12 @@ describe('ResultHandler', () => {
 
   describe('canHandle', () => {
     it('should handle result messages', () => {
-      const msg = { type: 'result', subtype: 'success' } as SDKResultMessage;
+      const msg = { type: 'result', subtype: 'success' } as unknown as SDKResultMessage;
       expect(handler.canHandle(msg)).toBe(true);
     });
 
     it('should not handle non-result messages', () => {
-      const msg = { type: 'assistant' } as SDKMessage;
+      const msg = { type: 'assistant' } as unknown as SDKMessage;
       expect(handler.canHandle(msg)).toBe(false);
     });
   });
@@ -42,7 +42,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -62,7 +62,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -82,7 +82,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -107,7 +107,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -129,7 +129,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -150,7 +150,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -170,7 +170,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -191,7 +191,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -212,7 +212,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -232,7 +232,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 
@@ -252,7 +252,7 @@ describe('ResultHandler', () => {
         usage: {},
         modelUsage: {},
         permission_denials: [],
-      } as SDKResultMessage;
+      } as unknown as SDKResultMessage;
 
       handler.handle(msg);
 

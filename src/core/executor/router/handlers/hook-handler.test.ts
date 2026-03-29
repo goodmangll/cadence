@@ -19,17 +19,17 @@ describe('HookHandler', () => {
 
   describe('canHandle', () => {
     it('should handle system messages', () => {
-      const msg = { type: 'system', subtype: 'init' };
+      const msg = { type: 'system', subtype: 'init' } as unknown as SDKHookResponseMessage;
       expect(handler.canHandle(msg)).toBe(true);
     });
 
     it('should handle auth_status messages', () => {
-      const msg = { type: 'auth_status', isAuthenticating: false, output: [] };
+      const msg = { type: 'auth_status', isAuthenticating: false, output: [] } as unknown as SDKAuthStatusMessage;
       expect(handler.canHandle(msg)).toBe(true);
     });
 
     it('should not handle other message types', () => {
-      const msg = { type: 'assistant' };
+      const msg = { type: 'assistant' } as unknown as SDKHookResponseMessage;
       expect(handler.canHandle(msg)).toBe(false);
     });
   });
@@ -44,7 +44,7 @@ describe('HookHandler', () => {
         stdout: 'Running hook',
         stderr: '',
         exit_code: 0,
-      } as SDKHookResponseMessage;
+      } as unknown as SDKHookResponseMessage;
 
       handler.handle(msg);
 
@@ -62,7 +62,7 @@ describe('HookHandler', () => {
         stdout: '',
         stderr: 'Hook failed',
         exit_code: 1,
-      } as SDKHookResponseMessage;
+      } as unknown as SDKHookResponseMessage;
 
       handler.handle(msg);
 
@@ -80,7 +80,7 @@ describe('HookHandler', () => {
         stdout: 'Hook completed',
         stderr: '',
         exit_code: 0,
-      } as SDKHookResponseMessage;
+      } as unknown as SDKHookResponseMessage;
 
       handler.handle(msg);
 
@@ -97,7 +97,7 @@ describe('HookHandler', () => {
         isAuthenticating: false,
         output: [],
         error: 'Invalid API key',
-      } as SDKAuthStatusMessage;
+      } as unknown as SDKAuthStatusMessage;
 
       handler.handle(msg);
 
@@ -112,7 +112,7 @@ describe('HookHandler', () => {
         isAuthenticating: false,
         output: [],
         error: undefined,
-      } as SDKAuthStatusMessage;
+      } as unknown as SDKAuthStatusMessage;
 
       handler.handle(msg);
 
@@ -130,7 +130,7 @@ describe('HookHandler', () => {
         stdout: 'Running hook',
         stderr: '',
         exit_code: 0,
-      } as SDKHookResponseMessage;
+      } as unknown as SDKHookResponseMessage;
 
       handler.handle(msg);
 
@@ -147,7 +147,7 @@ describe('HookHandler', () => {
         stdout: '',
         stderr: 'Hook failed',
         exit_code: 1,
-      } as SDKHookResponseMessage;
+      } as unknown as SDKHookResponseMessage;
 
       handler.handle(msg);
 
@@ -161,7 +161,7 @@ describe('HookHandler', () => {
         isAuthenticating: false,
         output: [],
         error: 'Invalid API key',
-      } as SDKAuthStatusMessage;
+      } as unknown as SDKAuthStatusMessage;
 
       handler.handle(msg);
 
